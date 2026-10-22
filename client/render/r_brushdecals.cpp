@@ -14,12 +14,11 @@ GNU General Public License for more details.
 #include "hud.h"
 #include "utils.h"
 #include "r_local.h"
-#include "pm_movevars.h"
 #include "r_shader.h"
-#include "r_world.h"
 #include <algorithm>
 
 #define MAX_DECALVERTS 4096 // per batch
+#define MAX_DECALS_PER_BATCH (MAX_DECALVERTS / 3)
 #define MAX_RENDER_DECALS 4096 // per brush model (including worldmodel)
 #define MAX_DECAL_BATCHES 1024 // per brush model (including worldmodel)
 
@@ -36,10 +35,10 @@ static GLuint decal_vao;
 static GLuint decal_vbo;
 static unsigned int num_render_decals = 0;
 decal_t *decal_list[MAX_RENDER_DECALS];
-short cached_decal_texture = -1;
-short cached_brush_texture = -1;
-short cached_lightmap = -1;
-short cached_shader = -1;
+static short cached_decal_texture = -1;
+static short cached_brush_texture = -1;
+static short cached_lightmap = -1;
+static short cached_shader = -1;
 
 static unsigned int m_arrayfirsts[MAX_DECALVERTS];
 static unsigned int decal_numverts[MAX_DECALVERTS];
@@ -52,10 +51,10 @@ static struct DecalBatch_s
 	short brush_texnum;
 	short shader;
 	decalarray_s decal_verts[MAX_DECALVERTS];
-	int numverts[MAX_RENDER_DECALS];
+	int numverts[MAX_DECALS_PER_BATCH];
 	int total_verts;
 	unsigned int numdecals;
-	int arrayfirsts[MAX_RENDER_DECALS];
+	int arrayfirsts[MAX_DECALS_PER_BATCH];
 } DecalBatch[MAX_DECAL_BATCHES];
 
 static void R_CreateDecalsVAO()
@@ -85,15 +84,12 @@ static void R_CreateDecalsVAO()
 void DrawSingleDecalLightPass( decal_t *decal )
 {
 	int	numVerts = 0;
-	float *v;
-	Vector4D lmcoord0, lmcoord1;
 
 	// check for valid
 	if( !decal->psurface )
 		return; // bad decal?
 
-	cl_entity_t *e = GET_ENTITY( decal->entityIndex );
-	v = DECAL_SETUP_VERTS( decal, decal->psurface, decal->texture, &numVerts );
+	float *v = DECAL_SETUP_VERTS( decal, decal->psurface, decal->texture, &numVerts );
 
 	if( numVerts > 32 ) // engine limit > renderer limit
 		numVerts = 32;
@@ -122,7 +118,7 @@ void DrawSurfaceDecalsLightPass( msurface_t *surf )
 	}
 }
 
-int SortDecals( const decal_t *a, const decal_t *b )
+static bool SortDecals( const decal_t *a, const decal_t *b )
 {	
 	// sort priority
 	// 1. shaders
@@ -133,11 +129,14 @@ int SortDecals( const decal_t *a, const decal_t *b )
 	if( a->texture != b->texture )
 		return a->texture > b->texture;
 
-	// 3. lightmap texture number
-	if( a->psurface->info->lightmaptexturenum != b->psurface->info->lightmaptexturenum )
-		return a->psurface->info->lightmaptexturenum > b->psurface->info->lightmaptexturenum;
+	// 3. brush texture number
+	int texa = a->psurface->texinfo->texture->gl_texturenum;
+	int texb = b->psurface->texinfo->texture->gl_texturenum;
+	if( texa != texb )
+		return texa < texb;
 
-	return 0;
+	// 4. lightmap texture number
+	return a->psurface->info->lightmaptexturenum < b->psurface->info->lightmaptexturenum;
 }
 
 void AddDecalToBatch( decal_t *decal )
@@ -153,19 +152,20 @@ void AddDecalToBatch( decal_t *decal )
 	if( num_batches + 1 == MAX_DECAL_BATCHES )
 		return;
 
-	cl_entity_t *e = GET_ENTITY( decal->entityIndex );
 	v = DECAL_SETUP_VERTS( decal, decal->psurface, decal->texture, &numVerts );
 
 	mextrasurf_t *es = decal->psurface->info;
-	bvert_t *mv = &world->vertexes[es->firstvertex];
 	msurface_t *surf = decal->psurface;
 	mtexinfo_t *tex = surf->texinfo;
 	Vector normal = FBitSet( surf->flags, SURF_PLANEBACK ) ? -surf->plane->normal : surf->plane->normal;
-	int decalFlags = 0;
 
 	bool bAdvanceBatch = false;
 
-	if( DecalBatch[num_batches].total_verts + numVerts >= MAX_DECALVERTS )
+	if( numVerts < 3 || numVerts > MAX_DECALVERTS )
+		return;
+
+	if( DecalBatch[num_batches].total_verts + numVerts > MAX_DECALVERTS
+		|| DecalBatch[num_batches].numdecals >= MAX_DECALS_PER_BATCH )
 		bAdvanceBatch = true;
 
 	if( cached_decal_texture == -1 )
@@ -240,27 +240,18 @@ void AddDecalToBatch( decal_t *decal )
 //============================================================================================
 // PrepareSurfaceDecals: check each surface of the bmodel and add decals to a single list
 //============================================================================================
-void PrepareSurfaceDecals(msurface_t* fa, bool project)
+void PrepareSurfaceDecals( msurface_t *fa, bool project )
 {
-	if( !fa->pdecals )
-		return;
-
-	if( num_render_decals == MAX_RENDER_DECALS )
-		return;
-
-	decal_t *p = fa->pdecals;
-
-	while( p )
+	for( decal_t *p = fa->pdecals; p; p = p->pnext )
 	{
-		if( num_render_decals == MAX_RENDER_DECALS )
+		if( num_render_decals >= MAX_RENDER_DECALS )
 			break;
-			
-		if( p->texture )
-		{
-			p->shaderNum = GL_UberShaderForBmodelDecal( p );
-			decal_list[num_render_decals++] = p;
-			p = p->pnext;
-		}
+
+		if( !p->texture || !p->psurface )
+			continue;
+
+		p->shaderNum = GL_UberShaderForBmodelDecal( p );
+		decal_list[num_render_decals++] = p;
 	}
 }
 
@@ -297,7 +288,7 @@ void DrawDecalsBatch( void )
 	if( num_render_decals == 0 )
 		return;
 
-	std::sort( decal_list, decal_list + num_render_decals, SortDecals );
+	std::stable_sort( decal_list, decal_list + num_render_decals, SortDecals );
 
 	num_batches = 0;
 	for( i = 0; i < MAX_DECAL_BATCHES; i++ )
@@ -344,6 +335,9 @@ void DrawDecalsBatch( void )
 
 	for( i = 0; i <= num_batches; i++ )
 	{
+		if( !DecalBatch[i].bUsed || !DecalBatch[i].numdecals )
+			continue;
+
 		if( cached_shader != DecalBatch[i].shader )
 		{
 			GL_BindShader( &glsl_programs[DecalBatch[i].shader] );
@@ -414,7 +408,7 @@ void DrawDecalsBatch( void )
 	if (CVAR_TO_BOOL(r_polyoffset))
 		pglDisable(GL_POLYGON_OFFSET_FILL);
 
-	if ((e->curstate.rendermode == kRenderTransTexture) || (e->curstate.rendermode == kRenderTransAdd) || (e->curstate.rendermode == kRenderFade) )
+	if( (e->curstate.rendermode == kRenderTransTexture) || (e->curstate.rendermode == kRenderTransAdd) )
 		GL_Cull(GL_FRONT);
 
 	GL_SelectTexture(glConfig.max_texture_units - 1); // force to cleanup all the units
