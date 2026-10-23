@@ -3727,105 +3727,115 @@ void R_WorldMarkVisibleFaces( void )
 {
 	msurface_t *surf, **mark;
 	mextrasurf_t *esrf;
-	mworldleaf_t *leaf;
 	int i, j;
 	const bool bBuildingCubemaps = IsBuildingCubemaps();
+	const bool bNormalPass = RP_NORMALPASS();
+	const bool bShadowPass = FBitSet( RI->params, RP_SHADOWPASS );
+	const bool bOverview = FBitSet( RI->params, RP_OVERVIEW );
+	const bool bShowBlocklight = r_show_blocklight->value;
+	const bool bSkipSky = (bShadowPass || tr.fIgnoreSkybox);
+	const Vector org = tr.modelorg;
 
-	if( RP_NORMALPASS() )
+	if( bNormalPass )
 	{
 		tr.bSkySurfFound = false;
 		tr.bShouldUseDynamicSun = false;
 	}
 
 	// always skip the leaf 0, because it's an outside leaf
-	for( i = 1, leaf = &world->leafs[1]; i < world->numleafs; i++, leaf++ )
+	mworldleaf_t *leaf = &world->leafs[1];
+	for( i = 1; i < world->numleafs; i++, leaf++ )
 	{
 		// during cubemap pass, all faces are visible - this way pvs is ignored and all faces have correct gamma. Fix it properly?
-		if( (CHECKVISBIT( RI->visbytes, leaf->cluster ) || bBuildingCubemaps) && (leaf->efrags || leaf->nummarksurfaces) )
+		if( !(leaf->efrags || leaf->nummarksurfaces) )
+			continue;
+
+		if( !bBuildingCubemaps && !CHECKVISBIT( RI->visbytes, leaf->cluster ) )
+			continue;
+		
+		if( bNormalPass && leaf->hasSky )
+			tr.bShouldUseDynamicSun = true;
+
+		if( RI->frustum.CullBox( leaf->mins, leaf->maxs ) )
+			continue;
+
+		// do additional culling in dev_overview mode
+		if( bOverview && R_CullNodeTopView( (mworldnode_t *)leaf ) )
+			continue;
+
+		// deal with model fragments in this leaf
+		if( leaf->efrags )
+			STORE_EFRAGS( leaf->efrags, tr.realframecount );
+
+		r_stats.c_world_leafs++;
+
+		if( leaf->nummarksurfaces <= 0 )
+			continue;
+
+		for( j = 0, mark = leaf->firstmarksurface; j < leaf->nummarksurfaces; j++, mark++ )
 		{
-			if( RP_NORMALPASS() && leaf->hasSky )
-				tr.bShouldUseDynamicSun = true;
+			const int facenum = *mark - worldmodel->surfaces;
+			bool force = false, backplane;
+			float dist;
 
-			if( RI->frustum.CullBox( leaf->mins, leaf->maxs ) )
-				continue;
+			if( CHECKVISBIT( RI->visfaces, facenum ) )
+				continue;	// already checked
+			SETVISBIT( RI->visfaces, facenum ); // don't bother check it again
 
-			// do additional culling in dev_overview mode
-			if( FBitSet( RI->params, RP_OVERVIEW ) && R_CullNodeTopView( (mworldnode_t *)leaf ) )
-				continue;
+			surf = worldmodel->surfaces + facenum;
+			esrf = surf->info;
 
-			// deal with model fragments in this leaf
-			if( leaf->efrags )
-				STORE_EFRAGS( leaf->efrags, tr.realframecount );
-
-			r_stats.c_world_leafs++;
-
-			if( leaf->nummarksurfaces <= 0 )
-				continue;
-
-			for( j = 0, mark = leaf->firstmarksurface; j < leaf->nummarksurfaces; j++, mark++ )
+			if( !bShadowPass && !bShowBlocklight )
 			{
-				const int facenum = *mark - worldmodel->surfaces;
-				bool force = false, backplane;
-				float dist;
-
-				if( CHECKVISBIT( RI->visfaces, facenum ) )
-					continue;	// already checked
-				SETVISBIT( RI->visfaces, facenum ); // don't bother check it again
-
-				surf = worldmodel->surfaces + facenum;
-				esrf = surf->info;
-
-				if( !(RI->params & RP_SHADOWPASS) && !r_show_blocklight->value )
-				{
-					// skip shadow surfaces during regular pass
-					if( surf->flags & SURF_SHADOWPASS )
-						continue;
-				}
-
-				if( FBitSet( surf->flags, SURF_DRAWSKY ) )
-				{
-					if( RP_NORMALPASS() )
-						tr.bSkySurfFound = true; // 3D sky will be rendered next frame (3dsky visibility state is delayed by 1 frame)
-				}
-
-				R_AddGrassToChain( surf, NULL, false, leaf ); // update leaf bounds
-
-				// in some cases surface is invisible but grass is visible
-				force = R_AddGrassToChain( surf, &RI->frustum );
-#if 1
-				if( !force )
-				{
-					if( !bBuildingCubemaps )
-					{
-						backplane = FBitSet( surf->flags, SURF_PLANEBACK ) ? true : false;
-						if( FBitSet( RI->params, RP_OVERVIEW ) )
-							dist = surf->plane->normal[2];
-						else dist = PlaneDiff( tr.modelorg, surf->plane );
-
-						if( (backplane && dist >= -BACKFACE_EPSILON) || (!backplane && dist <= BACKFACE_EPSILON) )
-							continue; // wrong side
-
-						if( RI->frustum.CullBox( surf->info->mins, surf->info->maxs ) )
-							continue;
-					}
-				}
-#else
-				if( !force && R_CullSurface( surf ) )
+				// skip shadow surfaces during regular pass
+				if( surf->flags & SURF_SHADOWPASS )
 					continue;
-#endif
-				if( FBitSet( surf->flags, SURF_DRAWSKY ) )
-				{
-					if( FBitSet( RI->params, RP_SHADOWPASS ) )
-						continue;
-
-					if( tr.fIgnoreSkybox )
-						continue;
-
-					R_AddSkyBoxSurface( surf );
-				}
-				else
-					R_AddSurfaceToDrawList( surf, false );
 			}
+
+			const bool isSky = FBitSet( surf->flags, SURF_DRAWSKY );
+
+			if( isSky )
+			{
+				if( bNormalPass )
+					tr.bSkySurfFound = true; // 3D sky will be rendered next frame (3dsky visibility state is delayed by 1 frame)
+			}
+
+			R_AddGrassToChain( surf, NULL, false, leaf ); // update leaf bounds
+
+			// in some cases surface is invisible but grass is visible
+			force = R_AddGrassToChain( surf, &RI->frustum );
+#if 1
+			if( !force && !bBuildingCubemaps )
+			{
+				const float dist = bOverview ? surf->plane->normal[2] : PlaneDiff( org, surf->plane );
+
+				if( FBitSet( surf->flags, SURF_PLANEBACK ) )
+				{
+					if( dist >= -BACKFACE_EPSILON )
+						continue;
+				}
+				else if( dist <= BACKFACE_EPSILON )
+					continue;
+
+				if( RI->frustum.CullBox( esrf->mins, esrf->maxs ) )
+					continue;
+			}
+#else
+			if( !force && R_CullSurface( surf ) )
+				continue;
+#endif
+			if( isSky )
+			{
+				if( bShadowPass )
+					continue;
+
+				if( bSkipSky )
+					continue;
+
+				R_AddSkyBoxSurface( surf );
+			}
+			else
+				R_AddSurfaceToDrawList( surf, false );
 		}
 	}
 }

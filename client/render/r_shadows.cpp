@@ -18,9 +18,7 @@ GNU General Public License for more details.
 #include "r_local.h"
 #include "r_cvars.h"
 #include "mathlib.h"
-#include "event_api.h"
 #include "r_studio.h"
-#include "r_sprite.h"
 
 static const Vector light_sides[] =
 {
@@ -45,6 +43,15 @@ CFrustum CurrentPassFrustum;
 
 =============================================================
 */
+
+static void R_ShadowPassClear( void )
+{
+	GL_DepthMask( GL_TRUE );
+	pglEnable( GL_SCISSOR_TEST );
+	pglScissor( RI->viewport[0], RI->viewport[1], RI->viewport[2], RI->viewport[3] );
+	pglClear( GL_DEPTH_BUFFER_BIT );
+	pglDisable( GL_SCISSOR_TEST );
+}
 
 //==============================================================================
 // R_ResetShadowTextures: rebuild shadow textures if the size was changed
@@ -92,6 +99,16 @@ void R_ResetShadowTextures( void )
 		return;
 	}
 
+	// reset sun shadow texture
+	if( tr.sunShadowTexture )
+	{
+		FREE_TEXTURE( tr.sunShadowTexture );
+		tr.sunShadowTexture = 0;
+	}
+
+	const int sun_sh_size = bound( 256, (int)r_sun_shadow_size->value, 4096 );
+	tr.sunShadowTexture = CREATE_TEXTURE( "*sunshadow", sun_sh_size, sun_sh_size, NULL, TF_SHADOW );
+
 	// create 3 shadow textures to decrease flashlight first lag
 	for( i = 0; i < 4; i++ )
 	{
@@ -133,15 +150,16 @@ int R_AllocateShadowFramebuffer( plight_t *pl, int side = 0 )
 		{
 			i = (tr.num_CM_shadows_used - 1);
 
-			if( i >= MAX_SHADOWS )
+			if( i < 0 || i >= MAX_SHADOWS )
 			{
 				ConPrintf( "ERROR: R_AllocateShadowFramebuffer: shadow cubemaps limit exceeded!\n" );
 				return 0; // disable
 			}
 
-			texture = tr.shadowCubemaps[i];
+			// for the remaining sides, we can take the texture directly from the light
+			texture = pl->shadowTexture;
 
-			if( !tr.shadowCubemaps[i] )
+			if( !texture )
 			{
 				ConPrintf( "ERROR: R_AllocateShadowFramebuffer: cubemap not initialized!\n" );
 				return 0; // disable
@@ -151,7 +169,7 @@ int R_AllocateShadowFramebuffer( plight_t *pl, int side = 0 )
 		{
 			i = tr.num_CM_shadows_used;
 
-			if( i >= MAX_SHADOWS )
+			if( i < 0 || i >= MAX_SHADOWS )
 			{
 				ConPrintf( "ERROR: R_AllocateShadowFramebuffer: shadow cubemaps limit exceeded!\n" );
 				return 0; // disable
@@ -183,7 +201,7 @@ int R_AllocateShadowFramebuffer( plight_t *pl, int side = 0 )
 		if( !sh_framebuffer )
 			pglGenFramebuffers( 1, &sh_framebuffer );
 
-		if( i >= MAX_SHADOWS )
+		if( i < 0 || i >= MAX_SHADOWS )
 		{
 			ALERT( at_error, "R_AllocateShadowFramebuffer: shadow textures limit exceeded!\n" );
 			return 0; // disable
@@ -218,9 +236,9 @@ int R_AllocateShadowFramebuffer( plight_t *pl, int side = 0 )
 //==============================================================================
 int R_AllocateShadowTexture( void )
 {
-	int i = tr.num_shadows_used;
+	const int i = tr.num_shadows_used;
 
-	if( i >= MAX_SHADOWS )
+	if( i < 0 || i >= MAX_SHADOWS )
 	{
 		ConPrintf( "ERROR: R_AllocateShadowTexture: shadow textures limit exceeded!\n" );
 		return 0; // disable
@@ -318,9 +336,9 @@ static void R_ShadowPassSetupFrame( plight_t *pl, int split = 0 )
 		RI->viewangles[0] = anglemod( pl->angles[0] );
 		RI->viewangles[1] = anglemod( pl->angles[1] );
 		RI->viewangles[2] = anglemod( pl->angles[2] );
-		AngleVectors( RI->viewangles, RI->vforward, RI->vright, RI->vup );
 	}
 
+	AngleVectors( RI->viewangles, RI->vforward, RI->vright, RI->vup );
 	RI->vieworg = pl->origin;
 	RI->pvsorigin = pl->origin;
 
@@ -517,18 +535,21 @@ void R_RenderShadowScene( plight_t *pl )
 		return;
 	}
 
+	RI->viewport[0] = RI->viewport[1] = 0;
 	RI->viewport[2] = RI->viewport[3] = ShadowViewport;
 
 	if( FBOsupported )
+	{
 		pl->shadowTexture = R_AllocateShadowFramebuffer( pl );
+
+		if( !pl->shadowTexture )
+			return;
+	}
 
 	r_stats.num_passes++;
 	R_ShadowPassSetupFrame( pl );
 	R_ShadowPassSetupGL( pl );
-	pglEnable( GL_SCISSOR_TEST );
-	pglScissor( RI->viewport[0], RI->viewport[1], RI->viewport[2], RI->viewport[3] );
-	pglClear( GL_DEPTH_BUFFER_BIT );
-	pglDisable( GL_SCISSOR_TEST );
+	R_ShadowPassClear();
 
 	R_MarkLeaves();
 	R_ShadowPassDrawWorld( pl );
@@ -558,6 +579,12 @@ void R_RenderShadowCubeSide( plight_t *pl, int side )
 		return;
 	}
 
+	if( side == 0 )
+		pl->shadowTexture = 0;
+	else if( !pl->shadowTexture )
+		return;
+
+	RI->viewport[0] = RI->viewport[1] = 0;
 	RI->viewport[2] = RI->viewport[3] = ShadowViewport;
 
 	if( FBOsupported )
@@ -569,7 +596,7 @@ void R_RenderShadowCubeSide( plight_t *pl, int side )
 	if( !pl->shadow_side_culled[side] )
 	{
 		R_ShadowPassSetupGL( pl, side );
-		pglClear( GL_DEPTH_BUFFER_BIT );
+		R_ShadowPassClear();
 
 		R_MarkLeaves();
 		R_ShadowPassDrawWorld( pl );
@@ -578,6 +605,10 @@ void R_RenderShadowCubeSide( plight_t *pl, int side )
 		//	R_DrawParticles( false );
 
 		R_ShadowPassEndGL();
+	}
+	else
+	{
+		R_ShadowPassClear();
 	}
 
 	if( FBOsupported )
@@ -696,6 +727,7 @@ void R_RenderSunShadow( void )
 	pglFramebufferTexture2D( GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, RENDER_GET_PARM( PARM_TEX_TEXNUM, tr.sunShadowTexture ), 0 );
 
 	R_ShadowPassSetupGL( &sunPl );
+	R_ShadowPassClear();
 
 	// draw the casters double-sided so one-sided walls can't leak light
 	tr.sunShadowTwoSided = CVAR_TO_BOOL( r_sun_shadow_twosided );
@@ -705,8 +737,6 @@ void R_RenderSunShadow( void )
 	// slope-scaled bias to keep the flat lit surfaces free of self-shadow acne
 	pglEnable( GL_POLYGON_OFFSET_FILL );
 	pglPolygonOffset( r_sun_shadow_offset_factor->value, r_sun_shadow_offset_units->value );
-
-	pglClear( GL_DEPTH_BUFFER_BIT );
 
 	// mark the world from the camera pvs, not the light origin up in the sky
 	R_FindViewLeaf();
@@ -766,6 +796,8 @@ void R_RenderShadowmaps(void)
 	for( int i = 0; i < MAX_PLIGHTS; i++ )
 	{
 		plight_t *pl = &cl_plights[i];
+
+		pl->shadowTexture = 0;
 
 		if( FBitSet( pl->flags, CF_NOSHADOWS ) )
 			continue;
