@@ -377,20 +377,20 @@ Mod_HeadnodeVisible
 */
 bool Mod_HeadnodeVisible( mnode_t *node, const byte *visbits )
 {
-	if( !node || node->contents == CONTENTS_SOLID )
-		return false;
-
-	if( node->contents < 0 )
+	while( node )
 	{
-		if( CHECKVISBIT( visbits, ((mleaf_t *)node)->cluster ))
+		if( node->contents == CONTENTS_SOLID )
+			return false;
+
+		if( node->contents < 0 )
+			return CHECKVISBIT( visbits, ((mleaf_t *)node)->cluster ) != 0;
+
+		if( Mod_HeadnodeVisible( node->children[0], visbits ) )
 			return true;
-		return false;
+
+		node = node->children[1];
 	}
-
-	if( Mod_HeadnodeVisible( node->children[0], visbits ))
-		return true;
-
-	return Mod_HeadnodeVisible( node->children[1], visbits );
+	return false;
 }
 
 /*
@@ -407,8 +407,13 @@ bool Mod_BoxVisible( const Vector mins, const Vector maxs, const byte *visbits )
 	mnode_t *headnode;
 	int	i, count;
 
-	if( !visbits || !mins || !maxs )
+	if( !visbits )
 		return true;
+
+	int eIndex = -1;
+	cl_entity_t *e = RI->currententity;
+	if( e != NULL )
+		eIndex = e->index;
 
 	// during normalpass, use cached cull value, if the viewleaf is the same as last frame.
 	// this culling is expensive stuff
@@ -416,9 +421,7 @@ bool Mod_BoxVisible( const Vector mins, const Vector maxs, const byte *visbits )
 	const bool use_cache = (
 		r_cached_box_culling->value > 0 &&
 		RI->currentlight == NULL &&
-		RI->currententity != NULL &&
-		(RI->currententity->index > 0) &&
-		(RI->currententity->index < 8192) &&
+		(eIndex > 0) && (eIndex < 8192) &&
 		(RP_NORMALPASS() || bSkyboxView)
 		);
 
@@ -426,13 +429,13 @@ bool Mod_BoxVisible( const Vector mins, const Vector maxs, const byte *visbits )
 	{
 		if( !bSkyboxView )
 		{
-			if( RI->bBoxVisible[RI->currententity->index] != -1 && (RI->currententity->curstate.origin == RI->currententity->prevstate.origin) )
-				return RI->bBoxVisible[RI->currententity->index] > 0 ? true : false;
+			if( RI->bBoxVisible[eIndex] != -1 && (e->curstate.origin == e->prevstate.origin) )
+				return RI->bBoxVisible[eIndex] > 0 ? true : false;
 		}
 		else // 3D sky
 		{
-			if( RI->bBoxVisibleSkybox[RI->currententity->index] != -1 && (RI->currententity->curstate.origin == RI->currententity->prevstate.origin) )
-				return RI->bBoxVisibleSkybox[RI->currententity->index] > 0 ? true : false;
+			if( RI->bBoxVisibleSkybox[eIndex] != -1 && (e->curstate.origin == e->prevstate.origin) )
+				return RI->bBoxVisibleSkybox[eIndex] > 0 ? true : false;
 		}
 	}
 
@@ -448,9 +451,9 @@ bool Mod_BoxVisible( const Vector mins, const Vector maxs, const byte *visbits )
 			if( use_cache )
 			{
 				if( !bSkyboxView )
-					RI->bBoxVisible[RI->currententity->index] = 1;
+					RI->bBoxVisible[eIndex] = 1;
 				else
-					RI->bBoxVisibleSkybox[RI->currententity->index] = 1;
+					RI->bBoxVisibleSkybox[eIndex] = 1;
 			}
 			return true;
 		}
@@ -461,9 +464,9 @@ bool Mod_BoxVisible( const Vector mins, const Vector maxs, const byte *visbits )
 		if( use_cache )
 		{
 			if( !bSkyboxView )
-				RI->bBoxVisible[RI->currententity->index] = 1;
+				RI->bBoxVisible[eIndex] = 1;
 			else
-				RI->bBoxVisibleSkybox[RI->currententity->index] = 1;
+				RI->bBoxVisibleSkybox[eIndex] = 1;
 		}
 		return true;
 	}
@@ -471,9 +474,9 @@ bool Mod_BoxVisible( const Vector mins, const Vector maxs, const byte *visbits )
 	if( use_cache )
 	{
 		if( !bSkyboxView )
-			RI->bBoxVisible[RI->currententity->index] = 0;
+			RI->bBoxVisible[eIndex] = 0;
 		else
-			RI->bBoxVisibleSkybox[RI->currententity->index] = 0;
+			RI->bBoxVisibleSkybox[eIndex] = 0;
 	}
 
 	return false;
