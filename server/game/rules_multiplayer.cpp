@@ -947,37 +947,47 @@ void CHalfLifeMultiplay :: PlayerSpawn( CBasePlayer *pPlayer )
 		switch (pPlayer->m_iBonusWeaponLevel)
 		{
 		case 3:
+			pPlayer->NextRechargeTime = gpGlobals->time + 15; // cut down the recharge time
+			break;
+		case 4:
+			pPlayer->NextRechargeTime = gpGlobals->time + 10;
+			break;
+		case 5:
 			pPlayer->GiveNamedItem("weapon_hkmp5");
 			pPlayer->GiveAmmo(MP5_DEFAULT_GIVE, g_WpnAmmo[WEAPON_HKMP5], HKMP5_MAX_CARRY);
 			pPlayer->m_iBonusWeaponID = WEAPON_HKMP5;
+			pPlayer->NextRechargeTime = gpGlobals->time + 5;
 		break;
-		case 4:
+		case 6:
 			pPlayer->GiveNamedItem("weapon_9mmAR");
 			pPlayer->GiveAmmo(MRC_DEFAULT_GIVE, g_WpnAmmo[WEAPON_MRC], MRC_MAX_CARRY );
 			pPlayer->m_iBonusWeaponID = WEAPON_MRC;
+			pPlayer->NextRechargeTime = gpGlobals->time + 3;
 		break;
-		case 5:
+		case 7:
 			pPlayer->GiveNamedItem( "weapon_g36c" );
 			pPlayer->GiveAmmo( G36C_DEFAULT_GIVE, g_WpnAmmo[WEAPON_G36C], G36C_MAX_CARRY );
 			pPlayer->m_iBonusWeaponID = WEAPON_G36C;
+			pPlayer->NextRechargeTime = gpGlobals->time + 3;
 		break;
-		case 6:
+		case 8:
 			pPlayer->GiveNamedItem("weapon_9mmAR");
 			pPlayer->GiveAmmo(MRC_DEFAULT_GIVE, g_WpnAmmo[WEAPON_MRC], MRC_MAX_CARRY);
 			pPlayer->GiveAmmo(AMMO_M203BOX_GIVE, "ARgrenades", M203_GRENADE_MAX_CARRY);
 			pPlayer->m_iBonusWeaponID = WEAPON_MRC;
+			pPlayer->NextRechargeTime = gpGlobals->time + 3;
 		break;
-		case 7:
-		case 8:
+		case 9:
 			pPlayer->GiveNamedItem("weapon_gausniper");
 			pPlayer->GiveAmmo(AMMO_URANIUMBOX_GIVE, g_WpnAmmo[WEAPON_GAUSS], URANIUM_MAX_CARRY);
 			pPlayer->m_iBonusWeaponID = WEAPON_GAUSS;
+			pPlayer->NextRechargeTime = gpGlobals->time + 3;
 		break;
-		case 9:
 		case 10:
 			pPlayer->GiveNamedItem("weapon_ar2");
 			pPlayer->GiveAmmo(AMMO_URANIUMBOX_GIVE, g_WpnAmmo[WEAPON_GAUSS], URANIUM_MAX_CARRY);
 			pPlayer->m_iBonusWeaponID = WEAPON_AR2;
+			pPlayer->NextRechargeTime = gpGlobals->time + 3;
 		break;
 		}
 	}

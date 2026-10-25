@@ -8066,23 +8066,26 @@ void CBasePlayer::DropPlayerItem(const char* pszItemName)
 	// diffusion - drop actual weapon
 	CBasePlayerWeapon *pWeapon = (CBasePlayerWeapon *)pWeaponItem;
 
-	if( pWeapon && pWeapon->m_iId == m_iBonusWeaponID )
+	if( !pWeapon )
+		return;
+
+	if( pWeapon->m_iId == m_iBonusWeaponID )
 	{
 		// don't drop the gun you got as a bonus after death
 		m_iBonusWeaponID = 0;
 		return;
 	}
 
-	// don't drop knife
-	if( FClassnameIs(pWeaponItem, "weapon_knife" ) )
+	// don't drop knife or beretta (default equipment)
+	if( pWeapon->m_iId == WEAPON_BERETTA || pWeapon->m_iId == WEAPON_KNIFE )
 		return;
-	else if( FClassnameIs( pWeaponItem, "weapon_satchel" ) )
+	else if( pWeapon->m_iId == WEAPON_SATCHEL )
 	{
 		// don't drop satchels if the player deployed all of them
 		if( m_rgAmmo[GetAmmoIndex( pWeaponItem->pszAmmo1() )] <= 0 )
 			return;
 	}
-	else if( FClassnameIs( pWeaponItem, "weapon_handgrenade" ) )
+	else if( pWeapon->m_iId == WEAPON_HANDGRENADE )
 	{
 		// same goes for grenades
 		if( m_rgAmmo[GetAmmoIndex( pWeaponItem->pszAmmo1() )] <= 0 )
@@ -8095,7 +8098,7 @@ void CBasePlayer::DropPlayerItem(const char* pszItemName)
 
 	if( pDrop )
 	{
-		if( FClassnameIs(pDrop, "weapon_satchel") )
+		if( pWeapon->m_iId == WEAPON_SATCHEL )
 			DeactivateSatchels( this );
 		
 		pDrop->SetAbsAngles( Vector( pev->angles.x, RANDOM_LONG( 0, 359 ), pev->angles.z ) );
