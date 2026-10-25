@@ -271,31 +271,6 @@ bool CStudioModelRenderer::StudioSetEntity( cl_entity_t *pEnt )
 		return false; // out of memory ?
 	}
 
-	// server ragdoll marker but no bone data yet, pull the pose and skip drawing until the first reply lands
-	if( m_pCurrentEntity->curstate.iuser2 == -677 && ( !m_pModelInstance->m_bProceduralBones || m_pModelInstance->m_procCount < 1 ))
-	{
-		if( tr.time > m_pModelInstance->m_procRequestTime || m_pModelInstance->m_procRequestTime > tr.time + 2.5f )
-		{
-			bool firstRequest = ( m_pModelInstance->m_procRequestTime == 0.0f );
-			char szCmd[32];
-
-			Q_snprintf( szCmd, sizeof( szCmd ), "ragdoll_request %i\n", m_pCurrentEntity->index );
-			gEngfuncs.pfnServerCmd( szCmd );
-			m_pModelInstance->m_procRequestTime = tr.time + 2.0f;
-
-			// bounded hide, fall back to the animation pose if the server has nothing to send
-			if( firstRequest )
-			{
-				m_pModelInstance->m_procHideUntil = tr.time + 0.5f;
-			}
-		}
-
-		if( tr.time < m_pModelInstance->m_procHideUntil )
-		{
-			return false;
-		}
-	}
-
 	// all done
 	return true;
 }
@@ -5489,6 +5464,31 @@ int CStudioModelRenderer::StudioDrawModel( int flags )
 	
 	if( FBitSet( flags, STUDIO_RENDER ) )
 	{
+		// server ragdoll marker but no bone data yet, pull the pose and skip drawing until the first reply lands
+		if( m_pCurrentEntity->curstate.iuser2 == -677 && (!m_pModelInstance->m_bProceduralBones || m_pModelInstance->m_procCount < 1) )
+		{
+			if( tr.time > m_pModelInstance->m_procRequestTime || m_pModelInstance->m_procRequestTime > tr.time + 2.5f )
+			{
+				bool firstRequest = (m_pModelInstance->m_procRequestTime == 0.0f);
+				char szCmd[32];
+
+				Q_snprintf( szCmd, sizeof( szCmd ), "ragdoll_request %i\n", m_pCurrentEntity->index );
+				gEngfuncs.pfnServerCmd( szCmd );
+				m_pModelInstance->m_procRequestTime = tr.time + 2.0f;
+
+				// bounded hide, fall back to the animation pose if the server has nothing to send
+				if( firstRequest )
+				{
+					m_pModelInstance->m_procHideUntil = tr.time + 0.5f;
+				}
+			}
+
+			if( tr.time < m_pModelInstance->m_procHideUntil )
+			{
+				return 0;
+			}
+		}
+
 		if( !StudioComputeBBox( m_pCurrentEntity ) )
 			return 0; // invalid sequence
 
