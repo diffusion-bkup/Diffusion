@@ -97,6 +97,7 @@ typedef struct
 	Vector		color;
 	Vector		plightvec;
 
+	bool initialized;
 	float curambientlight;
 	float curshadelight;
 	Vector curplightvec;

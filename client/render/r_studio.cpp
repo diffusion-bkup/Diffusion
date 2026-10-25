@@ -4319,6 +4319,16 @@ void CStudioModelRenderer::StudioStaticLight( cl_entity_t *ent )
 
 		// diffusion - smooth light change for everything else (moving models like viewmodel, players etc)
 		const bool bDoLerp = !(ent->curstate.effects & EF_NOLIGHTLERP);
+		const bool bFirstUpdate = !m_pModelInstance->lighting.initialized;
+
+		if( bFirstUpdate )
+		{
+			m_pModelInstance->lighting.curambientlight = lighting.ambientlight;
+			m_pModelInstance->lighting.curshadelight = lighting.shadelight;
+			m_pModelInstance->lighting.color = lighting.color;
+			m_pModelInstance->lighting.curworldlightvec = Vector( lighting.plightvec );
+		}
+
 		m_pModelInstance->lighting.curambientlight = lerp( m_pModelInstance->lighting.curambientlight, lighting.ambientlight, 10.0f * g_fFrametime );
 		m_pModelInstance->lighting.curshadelight = lerp( m_pModelInstance->lighting.curshadelight, lighting.shadelight, 10.0f * g_fFrametime );
 		m_pModelInstance->lighting.ambientlight = bDoLerp ? m_pModelInstance->lighting.curambientlight : lighting.ambientlight;
@@ -4358,6 +4368,8 @@ void CStudioModelRenderer::StudioStaticLight( cl_entity_t *ent )
 		for( int i = 0; i < 6; i++ )
 		{
 			worldCube[i] = LerpRGB( flat, worldCube[i], coverage );
+			if( bFirstUpdate )
+				m_pModelInstance->lighting.curambient[i] = worldCube[i];
 		}
 
 		// the probe set swaps whole at a leaf border, so ease into it like the ambient it replaces
@@ -4389,6 +4401,8 @@ void CStudioModelRenderer::StudioStaticLight( cl_entity_t *ent )
 				dir.y * dir.y * srcCube[( dir.y < 0.0f ) ? 3 : 2] +
 				dir.z * dir.z * srcCube[( dir.z < 0.0f ) ? 5 : 4];
 		}
+
+		m_pModelInstance->lighting.initialized = true;
 	}
 }
 
