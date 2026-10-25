@@ -1046,8 +1046,10 @@ void CHalfLifeMultiplay :: PlayerKilled( CBasePlayer *pVictim, entvars_t *pKille
 	}
 
 	CBasePlayer *pTheKiller = (CBasePlayer *)CBaseEntity::Instance( pKiller );
+	if( pTheKiller && !pTheKiller->IsPlayer() )
+		pTheKiller = NULL;
 
-	if( mp_killercamera.value > 0 )
+	if( pTheKiller && mp_killercamera.value > 0 )
 	{
 		bool bSkipKillerCam = (FClassnameIs( pInflictor, "_playersentry" ) || FClassnameIs( pInflictor, "monster_tripmine" ));
 
@@ -1111,7 +1113,7 @@ void CHalfLifeMultiplay :: PlayerKilled( CBasePlayer *pVictim, entvars_t *pKille
 	UTIL_FireTargets( "game_playerdie", pVictim, pVictim, USE_TOGGLE, 0 );
 	CBasePlayer *peKiller = NULL;
 	CBaseEntity *ktmp = CBaseEntity::Instance( pKiller );
-	if ( ktmp && (ktmp->Classify() == CLASS_PLAYER) )
+	if ( ktmp && ktmp->IsPlayer() && (ktmp->Classify() == CLASS_PLAYER) )
 		peKiller = (CBasePlayer*)ktmp;
 
 	if ( pVictim->pev == pKiller )  
@@ -1139,7 +1141,7 @@ void CHalfLifeMultiplay :: PlayerKilled( CBasePlayer *pVictim, entvars_t *pKille
 
 	// killers score, if it's a player
 	CBaseEntity *ep = CBaseEntity::Instance( pKiller );
-	if ( ep && ep->Classify() == CLASS_PLAYER )
+	if ( ep && ep->IsPlayer() && ep->Classify() == CLASS_PLAYER )
 	{
 		CBasePlayer *PK = (CBasePlayer*)ep;
 

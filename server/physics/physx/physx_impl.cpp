@@ -99,6 +99,20 @@ CPhysicPhysX::CPhysicPhysX() :
 	m_worldBounds.maximum = PxVec3(32768, 32768, 32768);
 }
 
+//==================================================================================
+// PoolProbe: useful function to put around the code if suspected memory corruption
+//==================================================================================
+void CPhysicPhysX::PoolProbe( const char *tag )
+{
+	if( !m_pPhysics )
+		return;
+
+	ALERT( at_console, "probe %s ...\n", tag );
+	PxRigidDynamic *p = m_pPhysics->createRigidDynamic( PxTransform( PxIdentity ) );
+	if( p ) p->release();
+	ALERT( at_console, "probe %s ok\n", tag );
+}
+
 /*
 =================
 InitPhysic
@@ -1422,13 +1436,13 @@ void *CPhysicPhysX :: CreateBoxFromEntity( CBaseEntity *pObject )
 	boxGeometry.halfExtents = pObject->pev->size * CVAR_GET_FLOAT("phys_character_padding");
 
 	PxRigidDynamic *pActor = m_pPhysics->createRigidDynamic(PxTransform(PxIdentity));
-	PxShape *pShape = PxRigidActorExt::createExclusiveShape(*pActor, boxGeometry, *m_pDefaultMaterial);
-
-	if (!pActor)
+	if( !pActor )
 	{
-		ALERT( at_error, "failed to create rigidbody from entity %s\n", pObject->GetClassname());
+		ALERT( at_error, "failed to create rigidbody from entity %s\n", pObject->GetClassname() );
 		return NULL;
 	}
+
+	PxShape *pShape = PxRigidActorExt::createExclusiveShape(*pActor, boxGeometry, *m_pDefaultMaterial);
 
 	if (pShape)
 	{
@@ -2361,7 +2375,7 @@ void *CPhysicPhysX::SpawnRagdoll( CBaseEntity *pObject, const PendingRagdoll *pP
 			break;
 		}
 	}
-
+	
 	// derive geometry, collision masks and joint frames from the model reference pose
 	static matrix4x4 refWorld[MAXSTUDIOBONES];
 	if( !RagdollComputeReferencePose( phdr, refWorld ))

@@ -88,6 +88,7 @@ public:
 	virtual bool	IsBodySleeping( CBaseEntity *pEntity ) = 0;
 	virtual void	*GetCookingInterface( void ) = 0;
 	virtual void	*GetPhysicInterface( void ) = 0;
+	virtual void	PoolProbe( const char *tag ) = 0;
 };
 
 extern void GameInitNullPhysics( void ); // shutdown simulation for some reasons

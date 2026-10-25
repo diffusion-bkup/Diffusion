@@ -201,6 +201,7 @@ public:
 	bool	IsBodySleeping( CBaseEntity *pEntity );
 	void	*GetCookingInterface( void ) { return m_pCooking; }
 	void	*GetPhysicInterface( void ) { return m_pPhysics; }
+	void	PoolProbe( const char *tag );
 
 private:
 	// misc routines

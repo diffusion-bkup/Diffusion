@@ -102,6 +102,7 @@ public:
 	virtual bool	IsBodySleeping( CBaseEntity *pEntity ) { return true; } // entity is always sleeping while physics is not installed
 	virtual void *GetCookingInterface( void ) { return NULL; }
 	virtual void *GetPhysicInterface( void ) { return NULL; }
+	virtual void PoolProbe( const char *tag ) {}
 };
 
 CPhysicNull NullPhysic;
