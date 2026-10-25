@@ -110,9 +110,9 @@ typedef struct
 //=========================================================
 
 #ifdef XASH_X86
-#define	GRAPH_VERSION	(int)16// !!!increment this whever graph/node/link classes change, to obsolesce older disk files.
+#define	GRAPH_VERSION	(int)17// !!!increment this whever graph/node/link classes change, to obsolesce older disk files.
 #else // 64-bit
-#define	GRAPH_VERSION	(int)32
+#define	GRAPH_VERSION	(int)33
 #endif
 
 class CGraph
@@ -335,7 +335,8 @@ class CQueuePriority
 public:
 
 	CQueuePriority( void );// constructor
-	inline int Full ( void ) { return ( m_cSize == MAX_STACK_NODES ); }
+	~CQueuePriority( void );
+	inline int Full ( void ) { return 0; } // grows on demand
 	inline int Empty ( void ) { return ( m_cSize == 0 ); }
 	//inline int Tail ( float & ) { return ( m_queue[ m_tail ].Id ); }
 	inline int Size ( void ) { return ( m_cSize ); }
@@ -343,12 +344,16 @@ public:
 	int Remove( float &);
 
 private:
+	CQueuePriority( const CQueuePriority & );	// not copyable (owns m_heap)
+	void operator=( const CQueuePriority & );
+
 	int	m_cSize;
+	int	m_cCapacity;
     struct tag_HEAP_NODE
     {
         int   Id;
         float Priority;
-    } m_heap[ MAX_STACK_NODES ];
+    } *m_heap;
 	void Heap_SiftDown(int);
 	void Heap_SiftUp(void);
 

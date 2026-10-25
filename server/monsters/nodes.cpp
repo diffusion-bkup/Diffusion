@@ -535,6 +535,41 @@ float CGraph::PathLength( int iStart, int iDest, int iHull, int afCapMask )
 }
 
 //=========================================================================================================
+// EmitRepeatPhrase: writes a "repeat" phrase to the compressed routing stream, returns bytes written
+//=========================================================================================================
+static int EmitRepeatPhrase( int8_t *&p, int cRepeats, int iLastNode, int iFrom, int cNodes )
+{
+	int a = iLastNode - iFrom;
+	int b = a + cNodes;
+	int c = a - cNodes;
+
+	if ( -128 <= a && a <= 127 )
+	{
+		*p++ = (int8_t)( cRepeats - 1 );
+		*p++ = (int8_t)a;
+		return 2;
+	}
+	else if ( -128 <= b && b <= 127 )
+	{
+		*p++ = (int8_t)( cRepeats - 1 );
+		*p++ = (int8_t)b;
+		return 2;
+	}
+	else if ( -128 <= c && c <= 127 )
+	{
+		*p++ = (int8_t)( cRepeats - 1 );
+		*p++ = (int8_t)c;
+		return 2;
+	}
+
+	*p++ = 127;
+	*p++ = (int8_t)( cRepeats - 1 );
+	*p++ = (int8_t)( iLastNode & 0xFF );
+	*p++ = (int8_t)( ( iLastNode >> 8 ) & 0xFF );
+	return 4;
+}
+
+//=========================================================================================================
 // NextNodeInRoute: parse the routing table at iCurrentNode for the next node on the shortest path to iDest
 //=========================================================================================================
 int CGraph::NextNodeInRoute( int iCurrentNode, int iDest, int iHull, int iCap )
@@ -567,6 +602,25 @@ int CGraph::NextNodeInRoute( int iCurrentNode, int iDest, int iHull, int iCap )
 		else
 		{
 			//ALERT(at_aiconsole, "C(%d)", *pRoute);
+
+			if (ch == 127)
+			{
+				// Extended repeat phrase: [127][count-1][lo][hi], absolute node index
+				int nRepeat = (uint8_t)pRoute[0] + 1;
+				int iAbsNode = (uint8_t)pRoute[1] | ((uint8_t)pRoute[2] << 8);
+				pRoute += 3;
+
+				if (nCount <= nRepeat)
+				{
+					iNext = iAbsNode;
+					nCount = 0;
+				}
+				else
+				{
+					nCount -= nRepeat;
+				}
+				continue;
+			}
 
 			// Repeat phrase
 			if (nCount <= ch+1)
@@ -692,6 +746,10 @@ int CGraph :: FindShortestPath ( int *piPath, int iStart, int iDest, int iHull, 
 			// now pull a node out of the queue
 			float flCurrentDistance;
 			iCurrentNode = queue.Remove(flCurrentDistance);
+
+			// stale duplicate entry: a shorter path to this node was already queued
+			if ( flCurrentDistance > m_pNodes[ iCurrentNode ].m_flClosestSoFar + 0.001f )
+				continue;
 
 			// For straight-line weights, the following Shortcut works. For arbitrary weights, it doesn't.
 			if (iCurrentNode == iDest) break;
@@ -1715,7 +1773,9 @@ void CTestHull :: BuildNodeGraph( void )
 		}
 		else if( UTIL_PointContents( WorldGraph.m_pNodes[i].m_vecOrigin ) == CONTENTS_WATER )
 		{
-			WorldGraph.m_pNodes[i].m_afNodeInfo |= bits_NODE_WATER;
+			// replace (don't OR) so water nodes lose LAND/LANDBIG: otherwise they get pushed down
+			// by NODE_HEIGHT below, and land monsters can pick them in FindNearestNode.
+			WorldGraph.m_pNodes[i].m_afNodeInfo = bits_NODE_WATER;
 		}
 		else if( WorldGraph.m_pNodes[i].m_afNodeInfo & bits_NODE_LAND )
 		{
@@ -2239,6 +2299,14 @@ int CQueue :: Remove ( float &fPriority )
 CQueuePriority :: CQueuePriority( void )
 {
 	m_cSize = 0;
+	m_cCapacity = MAX_STACK_NODES;
+	m_heap = new tag_HEAP_NODE[m_cCapacity];
+}
+
+CQueuePriority :: ~CQueuePriority( void )
+{
+	delete[] m_heap;
+	m_heap = NULL;
 }
 
 //=========================================================
@@ -2247,10 +2315,15 @@ CQueuePriority :: CQueuePriority( void )
 void CQueuePriority :: Insert( int iValue, float fPriority )
 {
 
-	if ( Full() )
+	// the algorithm inserts duplicates (no decrease-key), so the heap must be able to grow
+	if ( m_cSize >= m_cCapacity )
 	{
-		printf ( "Queue is full!\n" );
-		return;
+		int iNewCapacity = m_cCapacity * 2;
+		tag_HEAP_NODE *pNew = new tag_HEAP_NODE[iNewCapacity];
+		memcpy( pNew, m_heap, sizeof( tag_HEAP_NODE ) * m_cSize );
+		delete[] m_heap;
+		m_heap = pNew;
+		m_cCapacity = iNewCapacity;
 	}
 
     m_heap[ m_cSize ].Priority = fPriority;
@@ -2265,6 +2338,12 @@ void CQueuePriority :: Insert( int iValue, float fPriority )
 //=========================================================
 int CQueuePriority :: Remove( float &fPriority )
 {
+	if ( m_cSize <= 0 )
+	{
+		fPriority = 0;
+		return -1;
+	}
+
 	int iReturn = m_heap[ 0 ].Id;
 	fPriority = m_heap[ 0 ].Priority;
 
@@ -2958,8 +3037,8 @@ void CGraph::BuildRegionTables(void)
 		int j;
 		for (j = 0; j < NUM_RANGES; j++)
 		{
-			m_RangeStart[i][j] = 255;
-			m_RangeEnd[i][j] = 0;
+			m_RangeStart[i][j] = m_cNodes; // indices into the sorted list, can exceed 255
+			m_RangeEnd[i][j] = -1;         // empty range: start > end
 		}
 		for (j = 0; j < m_cNodes; j++)
 		{
@@ -3065,8 +3144,7 @@ void CGraph :: ComputeStaticRoutingTables( void )
 
 	int *pMyPath = new int[m_cNodes];
 	uint16_t *BestNextNodes = new uint16_t[m_cNodes];
-	int8_t *pRoute = new int8_t[m_cNodes*2];
-
+	int8_t *pRoute = new int8_t[m_cNodes*4]; // worst case: every node is an extended 4-byte phrase
 
 	if (Routes && pMyPath && BestNextNodes && pRoute)
 	{
@@ -3160,7 +3238,7 @@ void CGraph :: ComputeStaticRoutingTables( void )
 					for (int i = 0; i < m_cNodes; i++)
 					{
 						BOOL CanRepeat = ((BestNextNodes[i] == iLastNode) && cRepeats < 127);
-						BOOL CanSequence = (BestNextNodes[i] == i && cSequence < 128);
+						BOOL CanSequence = (BestNextNodes[i] == i && cSequence < 127); // -128 would overflow int8 in NextNodeInRoute
 
 						if (cRepeats)
 						{
@@ -3170,35 +3248,7 @@ void CGraph :: ComputeStaticRoutingTables( void )
 							{
 								// Emit the repeat phrase.
 								//
-								CompressedSize += 2; // (count-1, iLastNode-i)
-								*p++ = cRepeats - 1;
-								int a = iLastNode - iFrom;
-								int b = iLastNode - iFrom + m_cNodes;
-								int c = iLastNode - iFrom - m_cNodes;
-								if (-128 <= a && a <= 127)
-								{
-									*p++ = a;
-								}
-								else if (-128 <= b && b <= 127)
-								{
-									*p++ = b;
-								}
-								else if (-128 <= c && c <= 127)
-								{
-									*p++ = c;
-								}
-								else
-								{
-									ALERT( at_aiconsole, "Nodes need sorting (%d [%.f %.f %.f], %d [%.f %.f %.f])!\n",
-										iLastNode,
-										m_pNodes[iLastNode].m_vecOrigin.x,
-										m_pNodes[iLastNode].m_vecOrigin.y,
-										m_pNodes[iLastNode].m_vecOrigin.z,
-										iFrom,
-										m_pNodes[iFrom].m_vecOrigin.x,
-										m_pNodes[iFrom].m_vecOrigin.y,
-										m_pNodes[iFrom].m_vecOrigin.z );
-								}
+								CompressedSize += EmitRepeatPhrase( p, cRepeats, iLastNode, iFrom, m_cNodes );
 								cRepeats = 0;
 
 								if (CanSequence)
@@ -3262,40 +3312,7 @@ void CGraph :: ComputeStaticRoutingTables( void )
 					{
 						// Emit the repeat phrase.
 						//
-						CompressedSize += 2;
-						*p++ = cRepeats - 1;
-#if 0
-						iLastNode = iFrom + *pRoute;
-						if (iLastNode >= m_cNodes) iLastNode -= m_cNodes;
-						else if (iLastNode < 0) iLastNode += m_cNodes;
-#endif
-						int a = iLastNode - iFrom;
-						int b = iLastNode - iFrom + m_cNodes;
-						int c = iLastNode - iFrom - m_cNodes;
-						if (-128 <= a && a <= 127)
-						{
-							*p++ = a;
-						}
-						else if (-128 <= b && b <= 127)
-						{
-							*p++ = b;
-						}
-						else if (-128 <= c && c <= 127)
-						{
-							*p++ = c;
-						}
-						else
-						{
-							ALERT( at_aiconsole, "Nodes need sorting (%d [%.f %.f %.f], %d [%.f %.f %.f])!\n",
-								iLastNode, 
-								m_pNodes[iLastNode].m_vecOrigin.x,
-								m_pNodes[iLastNode].m_vecOrigin.y,
-								m_pNodes[iLastNode].m_vecOrigin.z,
-								iFrom,
-								m_pNodes[iFrom].m_vecOrigin.x,
-								m_pNodes[iFrom].m_vecOrigin.y,
-								m_pNodes[iFrom].m_vecOrigin.z );
-						}
+						CompressedSize += EmitRepeatPhrase( p, cRepeats, iLastNode, iFrom, m_cNodes );
 					}
 
 					if (cSequence)
