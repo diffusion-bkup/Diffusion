@@ -36,8 +36,6 @@ engine_studio_api_t IEngineStudio;
 // the renderer object, created on the stack.
 CStudioModelRenderer g_StudioRenderer;
 
-//#define DIFFUSION_TEMPORARY_HACK // REMOVE THIS WHEN PLAYER MODELS ARE FIXED
-
 #define MAX_STUDIO_SCALE 32.0f
 
 //================================================================================================
@@ -2515,35 +2513,6 @@ void CStudioModelRenderer::StudioSetUpTransform( void )
 		// don't rotate clients, only aim
 		angles[PITCH] = 0.0f;
 
-		//==================================DELETE THIS SHIT WHEN PLAYER INTERPOLATION IS FIXED=========================
-#ifdef DIFFUSION_TEMPORARY_HACK
-		if( 1 )                 // tr.viewparams.maxclients > 1 )
-		{
-			//	if( fabs( angles[YAW] - m_pCurrentEntity->latched.prevangles[YAW] ) > 20 ) // sudden change of yaw, snap it
-			angles[YAW] = m_pCurrentEntity->latched.prevangles[YAW];
-
-			if( angles[YAW] < -0.0f )
-				angles[YAW] += 360.0f;
-
-			if( m_pCurrentEntity->curstate.solid != 0 ) // check if dead...
-			{
-				if( m_pCurrentEntity->curstate.sequence != 8 ) // make sure it's not a jump
-				{
-					// otherwise always use "holding a gun" sequence...
-					if( m_pCurrentEntity->curstate.usehull == 1 ) // crouching!
-						m_pCurrentEntity->curstate.sequence = 49;
-					else
-					{
-						if( m_pCurrentEntity->curstate.sequence <= 0 )
-							m_pCurrentEntity->curstate.sequence = 1; // no weapons
-						else
-							m_pCurrentEntity->curstate.sequence = 16;
-					}
-				}
-			}
-		}
-#endif
-		//==============================================================================================================
 		if( m_pPlayerInfo->gaitsequence != m_pModelInstance->lerp.gaitsequence )
 		{
 			AddBlendSequence( m_pModelInstance->lerp.gaitsequence, m_pPlayerInfo->gaitsequence, m_pModelInstance->lerp.gaitframe, true );

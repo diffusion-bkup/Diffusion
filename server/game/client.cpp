@@ -1244,11 +1244,13 @@ void ServerDeactivate( void )
 	{
 		CBaseEntity *plr = UTIL_PlayerByIndex( i );
 
-		if( plr && plr->pev->flags & FL_FAKECLIENT )
+		if( plr && (plr->pev->flags & FL_FAKECLIENT) )
 		{
-			char cmd[40];
-			sprintf( cmd, "kick \"%s\"\n", STRING( plr->pev->netname ) );
-			SERVER_COMMAND( cmd );
+			int userid = GETPLAYERUSERID( plr->edict() );
+			if( userid != -1 )
+			{
+				SERVER_COMMAND( UTIL_VarArgs( "kick #%d\n", userid ) );
+			}
 		}
 	}
 
