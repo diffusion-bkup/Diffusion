@@ -9,8 +9,6 @@
 
 #include "achievementdata.h"
 
-#include "virtualfs.h"
-
 #define SHOW_ACHIEVEMENT_TIME 7
 
 const float fTOTAL_WIDTH = 666.f; // minimum value

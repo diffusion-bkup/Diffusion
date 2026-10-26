@@ -2,8 +2,6 @@
 #include "utils.h"
 #include "parsemsg.h"
 #include "r_local.h"
-#include "triangleapi.h"
-#include "r_shader.h"
 #include "event_api.h"
 
 //===========================================================================================

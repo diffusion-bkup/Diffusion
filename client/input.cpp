@@ -22,9 +22,7 @@
 #include "const.h"
 #include "kbutton.h"
 #include "r_view.h"
-#include "keydefs.h"
 #include <mathlib.h>
-#include "r_local.h"
 
 #define BUTTON_DOWN		1
 #define IMPULSE_DOWN	2

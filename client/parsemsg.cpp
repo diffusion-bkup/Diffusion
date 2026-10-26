@@ -15,8 +15,6 @@
 
 #include "hud.h"
 #include "utils.h"
-#include "r_local.h"
-#include "pm_movevars.h"
 #include "enginefeatures.h"
 #include "r_cvars.h"
 

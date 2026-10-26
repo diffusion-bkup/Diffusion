@@ -2,9 +2,7 @@
 #include "utils.h"
 #include "parsemsg.h"
 #include "r_local.h"
-#include "string.h"
 #include "triangleapi.h"
-#include <stdio.h>
 
 DECLARE_MESSAGE( m_HealthVisual, HealthVisual )
 DECLARE_MESSAGE( m_HealthVisual, HealthVisualAlice )

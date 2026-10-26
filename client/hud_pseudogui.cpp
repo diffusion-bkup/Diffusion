@@ -1,9 +1,7 @@
 #include "hud.h"
 #include "utils.h"
 #include "parsemsg.h"
-#include "triangleapi.h"
 #include "r_local.h"
-#include "keydefs.h"
 
 /*
 ====================================================================================

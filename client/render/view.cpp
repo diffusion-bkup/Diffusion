@@ -6,7 +6,6 @@
 #include "hud.h"
 #include "utils.h"
 #include "r_view.h"
-#include "eiface.h"
 #include "ref_params.h"
 #include "pm_movevars.h"
 #include "pm_defs.h"
@@ -15,8 +14,6 @@
 #include "r_studio.h"
 #include "event_api.h"
 #include <mathlib.h>
-#include "ammohistory.h"
-#include "cdll_exp.h"
 
 // thirdperson camera
 void CAM_Think( void ) {}

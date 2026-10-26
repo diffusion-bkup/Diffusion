@@ -19,7 +19,6 @@
 //
 
 #include "hud.h"
-#include "utils.h"
 #include "parsemsg.h"
 
 DECLARE_MESSAGE( m_Geiger, Geiger )

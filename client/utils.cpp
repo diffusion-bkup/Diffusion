@@ -20,7 +20,6 @@ GNU General Public License for more details.
 #include "r_local.h"
 #include <mathlib.h>
 #include "r_efx.h"
-#include <algorithm>
 #ifndef _WIN32
 #include <dlfcn.h>
 #endif // _WIN32

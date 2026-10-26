@@ -3,9 +3,7 @@
 #include "parsemsg.h"
 #include "triangleapi.h"
 #include "r_local.h"
-#include "string.h"
 #include "event_api.h"
-#include <stdio.h>
 
 float OFFLINEFlashAlpha = 0;
 float StaminaLowSoundTime = 0;

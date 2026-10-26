@@ -1,8 +1,6 @@
 #include "hud.h"
 #include "utils.h"
-#include "parsemsg.h"
 #include "r_local.h"
-#include "string.h"
 
 static float dronebar_lerp_x = 0;
 

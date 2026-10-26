@@ -5,17 +5,13 @@
 
 // OpenAG
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <string>
-#include <unordered_set>
 #include <time.h>
 
 #include <discord-rpc/include/discord_rpc.h>
 
 #include "hud.h"
-#include "r_local.h"
-#include "r_world.h"
 #include "utils.h"
 
 #include "discord.h"

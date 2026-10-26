@@ -19,7 +19,6 @@
 
 #include "hud.h"
 #include "utils.h"
-#include "parsemsg.h"
 #include "ammohistory.h"
 #include "r_local.h"
 

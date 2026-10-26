@@ -23,10 +23,8 @@
 #include "parsemsg.h"
 #include "ammohistory.h"
 #include "pm_defs.h"
-#include "event_api.h"
 #include "r_local.h"
 #include "weaponinfo.h"
-#include "triangleapi.h"
 
 int		g_weaponselect = 0;
 WEAPON		*gpActiveSel;	// NULL means off, 1 means just the menu bar, otherwise

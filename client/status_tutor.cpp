@@ -3,8 +3,6 @@
 #include "parsemsg.h"
 #include "r_cvars.h"
 #include "r_local.h"
-#include "triangleapi.h"
-
 
 /*
 Example tutorial in titles.txt:

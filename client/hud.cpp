@@ -4,7 +4,6 @@
 
 #include "hud.h"
 #include "utils.h"
-#include "parsemsg.h"
 #include "r_local.h"
 
 bool g_bDuckToggled; // diffusion - http://articles.thewavelength.net/378
