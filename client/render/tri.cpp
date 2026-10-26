@@ -15,13 +15,10 @@
 #include "const.h"
 #include "entity_state.h"
 #include "cl_entity.h"
-#include "triangleapi.h"
 #include "r_particle.h"
 #include "r_quakeparticle.h"
 #include "r_weather.h"
 #include "r_local.h"
-#include "edict.h"
-#include "r_sprite.h"
 #include "r_shader.h"
 
 #define MAX_CABLE_VERTS 65536

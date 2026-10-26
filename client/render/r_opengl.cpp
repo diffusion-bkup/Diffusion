@@ -18,16 +18,15 @@ GNU General Public License for more details.
 #include "hud.h"
 #include "utils.h"
 #include "r_local.h"
-#include "r_particle.h"
 #include "r_weather.h"
 #include "mathlib.h"
 
 #define MAX_RESERVED_UNIFORMS		22	// dynamic lighting estimates 42 uniforms... 
 
-glState_t		glState;
-glConfig_t	glConfig;
+glState_t glState;
+glConfig_t glConfig;
 
-static dllfunc_t opengl_110funcs[] =
+static const dllfunc_t opengl_110funcs[] =
 {
 { "glClearColor"         	, (void **)&pglClearColor },
 { "glClear"              	, (void **)&pglClear },
@@ -159,7 +158,7 @@ static dllfunc_t opengl_110funcs[] =
 { NULL, NULL }
 };
 
-static dllfunc_t opengl_200funcs[] =
+static const dllfunc_t opengl_200funcs[] =
 {
 { "glCreateShader"				, (void **)&pglCreateShader },
 { "glAttachShader"				, (void **)&pglAttachShader },
@@ -224,28 +223,19 @@ static dllfunc_t opengl_200funcs[] =
 { NULL, NULL }
 };
 
-static dllfunc_t drawrangeelementsfuncs[] =
+static const dllfunc_t drawrangeelementsfuncs[] =
 {
 { "glDrawRangeElements" , (void **)&pglDrawRangeElements },
 { NULL, NULL }
 };
 
-static dllfunc_t drawrangeelementsextfuncs[] =
+static const dllfunc_t drawrangeelementsextfuncs[] =
 {
 { "glDrawRangeElementsEXT" , (void **)&pglDrawRangeElementsEXT },
 { NULL, NULL }
 };
 
-static dllfunc_t debugoutputfuncs[] =
-{
-{ "glDebugMessageControlARB" , (void **)&pglDebugMessageControlARB },
-{ "glDebugMessageInsertARB" , (void **)&pglDebugMessageInsertARB },
-{ "glDebugMessageCallbackARB" , (void **)&pglDebugMessageCallbackARB },
-{ "glGetDebugMessageLogARB" , (void **)&pglGetDebugMessageLogARB },
-{ NULL, NULL }
-};
-
-static dllfunc_t multitexturefuncs[] =
+static const dllfunc_t multitexturefuncs[] =
 {
 { "glMultiTexCoord1fARB"     , (void **)&pglMultiTexCoord1f },
 { "glMultiTexCoord2fARB"     , (void **)&pglMultiTexCoord2f },
@@ -258,27 +248,13 @@ static dllfunc_t multitexturefuncs[] =
 { NULL, NULL }
 };
 
-static dllfunc_t texture3dextfuncs[] =
-{
-{ "glTexImage3DEXT"        , (void **)&pglTexImage3D },
-{ "glTexSubImage3DEXT"     , (void **)&pglTexSubImage3D },
-{ "glCopyTexSubImage3DEXT" , (void **)&pglCopyTexSubImage3D },
-{ NULL, NULL }
-};
-
-static dllfunc_t blendseparatefunc[] =
+static const dllfunc_t blendseparatefunc[] =
 {
 { "glBlendFuncSeparateEXT", (void **)&pglBlendFuncSeparate },
 { NULL, NULL }
 };
 
-static dllfunc_t blendequationfuncs[] =
-{
-{ "glBlendEquationEXT" , (void **)&pglBlendEquationEXT },
-{ NULL, NULL }
-};
-
-static dllfunc_t shaderobjectsfuncs[] =
+static const dllfunc_t shaderobjectsfuncs[] =
 {
 { "glDeleteObjectARB"             , (void **)&pglDeleteObjectARB },
 { "glGetHandleARB"                , (void **)&pglGetHandleARB },
@@ -334,7 +310,7 @@ static dllfunc_t shaderobjectsfuncs[] =
 { NULL, NULL }
 };
 
-static dllfunc_t vertexshaderfuncs[] =
+static const dllfunc_t vertexshaderfuncs[] =
 {
 { "glVertexAttribPointerARB"      , (void **)&pglVertexAttribPointerARB },
 { "glEnableVertexAttribArrayARB"  , (void **)&pglEnableVertexAttribArrayARB },
@@ -345,7 +321,7 @@ static dllfunc_t vertexshaderfuncs[] =
 { NULL, NULL }
 };
 
-static dllfunc_t vbofuncs[] =
+static const dllfunc_t vbofuncs[] =
 {
 { "glBindBufferARB"    , (void **)&pglBindBufferARB },
 { "glDeleteBuffersARB" , (void **)&pglDeleteBuffersARB },
@@ -358,7 +334,7 @@ static dllfunc_t vbofuncs[] =
 { NULL, NULL }
 };
 
-static dllfunc_t vaofuncs[] =
+static const dllfunc_t vaofuncs[] =
 {
 { "glBindVertexArray"    , (void **)&pglBindVertexArray },
 { "glDeleteVertexArrays" , (void **)&pglDeleteVertexArrays },
@@ -367,7 +343,7 @@ static dllfunc_t vaofuncs[] =
 { NULL, NULL }
 };
 
-static dllfunc_t fbofuncs[] =
+static const dllfunc_t fbofuncs[] =
 {
 { "glIsRenderbuffer"                      , (void **)&pglIsRenderbuffer },
 { "glBindRenderbuffer"                    , (void **)&pglBindRenderbuffer },
@@ -389,7 +365,7 @@ static dllfunc_t fbofuncs[] =
 { NULL, NULL}
 };
 
-static dllfunc_t occlusionfunc[] =
+static const dllfunc_t occlusionfunc[] =
 {
 { "glGenQueriesARB"        , (void **)&pglGenQueriesARB },
 { "glDeleteQueriesARB"     , (void **)&pglDeleteQueriesARB },
@@ -402,7 +378,7 @@ static dllfunc_t occlusionfunc[] =
 { NULL, NULL }
 };
 
-static dllfunc_t binaryshaderfuncs[] =
+static const dllfunc_t binaryshaderfuncs[] =
 {
 { "glProgramBinary"              , (void **)&pglProgramBinaryARB },
 { "glGetProgramBinary"           , (void **)&pglGetProgramBinaryARB },

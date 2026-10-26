@@ -16,14 +16,9 @@ GNU General Public License for more details.
 #include "hud.h"
 #include "utils.h"
 #include "r_local.h"
-#include "pm_movevars.h"
-#include "enginefeatures.h"
-#include "event_api.h"
 #include "mathlib.h"
 #include "r_shader.h"
 #include "r_world.h"
-#include "pm_defs.h"
-#include "entity_types.h"
 #include <algorithm>
 
 static gl_world_t	worlddata;

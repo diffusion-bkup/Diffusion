@@ -19,10 +19,8 @@ GNU General Public License for more details.
 #include "event_api.h"
 #include "triangleapi.h"
 #include "parsemsg.h"
-#include "enginefeatures.h"
 #include "r_weather.h"
 #include "r_local.h"
-#include "matrix.h"
 #include "r_quakeparticle.h"
 #include <mathlib.h>
 

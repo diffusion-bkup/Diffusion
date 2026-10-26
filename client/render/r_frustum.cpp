@@ -15,12 +15,8 @@ GNU General Public License for more details.
 
 #include "hud.h"
 #include "utils.h"
-#include "const.h"
-#include "ref_params.h"
 #include "r_local.h"
 #include <mathlib.h>
-#include <stringlib.h>
-#include "r_world.h"
 
 void CFrustum :: ClearFrustum( void )
 {

@@ -16,11 +16,7 @@ GNU General Public License for more details.
 #include "hud.h"
 #include "utils.h"
 #include "r_local.h"
-#include "pm_movevars.h"
-#include "enginefeatures.h"
 #include "mathlib.h"
-#include "r_particle.h"
-#include "r_weather.h"
 
 static int	rtable[MOD_FRAMES][MOD_FRAMES];
 

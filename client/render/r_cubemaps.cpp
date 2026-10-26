@@ -16,13 +16,9 @@ GNU General Public License for more details.
 #include "hud.h"
 #include "utils.h"
 #include "r_local.h"
-#include "event_api.h"
-#include "const.h"
 #include "com_model.h"
-#include "ref_params.h"
 #include "mathlib.h"
 #include "r_world.h"
-#include "pm_defs.h"
 
 const Vector env_dir[] =
 {

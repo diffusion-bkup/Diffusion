@@ -17,15 +17,8 @@ GNU General Public License for more details.
 #include "utils.h"
 #include "r_local.h"
 #include "com_model.h"
-#include "r_studioint.h"
-#include "pm_movevars.h"
 #include "r_studio.h"
-#include "r_sprite.h"
-#include "event_api.h"
 #include <mathlib.h>
-#include "pm_defs.h"
-#include "triangleapi.h"
-#include "entity_types.h"
 #include "r_shader.h"
 #include "r_world.h"
 

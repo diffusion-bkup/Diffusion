@@ -27,7 +27,6 @@ GNU General Public License for more details.
 #include "r_view.h"
 #include "r_world.h"
 #include "r_cvars.h"
-#include "triangleapi.h"
 #include "discord.h"
 #include "build.h"
 #include "r_sprite.h"
