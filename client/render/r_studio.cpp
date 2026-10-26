@@ -5450,9 +5450,12 @@ int CStudioModelRenderer::StudioDrawModel( int flags )
 		// server ragdoll marker but no bone data yet, pull the pose and skip drawing until the first reply lands
 		if( m_pCurrentEntity->curstate.iuser2 == -677 && (!m_pModelInstance->m_bProceduralBones || m_pModelInstance->m_procCount < 1) )
 		{
+			if( m_pModelInstance->m_procHideUntil > tr.time + 0.5f )
+				m_pModelInstance->m_procHideUntil = 0.0f;
+
 			if( tr.time > m_pModelInstance->m_procRequestTime || m_pModelInstance->m_procRequestTime > tr.time + 2.5f )
 			{
-				bool firstRequest = (m_pModelInstance->m_procRequestTime == 0.0f);
+				bool firstRequest = (m_pModelInstance->m_procRequestTime == 0.0f) || (m_pModelInstance->m_procRequestTime > tr.time + 2.5f);
 				char szCmd[32];
 
 				Q_snprintf( szCmd, sizeof( szCmd ), "ragdoll_request %i\n", m_pCurrentEntity->index );
