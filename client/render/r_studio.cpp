@@ -217,6 +217,9 @@ bool CStudioModelRenderer::StudioSetEntity( cl_entity_t *pEnt )
 	SET_CURRENT_ENTITY( m_pCurrentEntity );
 	m_pPlayerInfo = NULL;
 
+	if( m_pCurrentEntity->curstate.iuser2 == -677 )
+		m_pCurrentEntity->origin = m_pCurrentEntity->curstate.origin;
+
 	if( !m_fDrawViewModel && (m_pCurrentEntity->player || m_pCurrentEntity->curstate.renderfx == kRenderFxDeadPlayer) )
 	{
 		if( m_pCurrentEntity->curstate.renderfx == kRenderFxDeadPlayer )

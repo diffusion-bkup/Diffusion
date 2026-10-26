@@ -421,6 +421,7 @@ bool Mod_BoxVisible( const Vector mins, const Vector maxs, const byte *visbits )
 		r_cached_box_culling->value > 0 &&
 		RI->currentlight == NULL &&
 		(eIndex > 0) && (eIndex < 8192) &&
+		(e->curstate.iuser2 != -677) && // don't use cache for ragdolls
 		(RP_NORMALPASS() || bSkyboxView)
 		);
 
