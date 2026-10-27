@@ -286,35 +286,41 @@ void ClientPutInServer( edict_t *pEntity )
 //==================================================================================
 // diffusion - play sounds when saying something
 //==================================================================================
-void SaySounds( char *Text, CBasePlayer *pPlayer )
-{	
-	// crashes in single player
-	if( g_pGameRules->TotalServerSounds_lol <= 0 || g_pGameRules->TotalServerSounds_meow <= 0 )
+void SaySounds( const char *Text, CBasePlayer *pPlayer )
+{
+	// no groups loaded (also covers singleplayer)
+	if( !g_pGameRules || g_pGameRules->m_iNumChatSoundGroups <= 0 )
 		return;
 
-	// TODO: make a proper text file for server to load so server can specify their own custom chat commands and sounds
-	/* example:
-	* "lol"
-	* {
-	* "sound/server/lol1.wav"
-	* "sound/server/lol2.wav"
-	* }
-	*/
-	
-	for( int i = 0; Text[i] != 0; i++ )
-		Text[i] = tolower( Text[i] );
-	
-	if( !strncmp( Text, "lol", 3 ) || !strncmp( Text, "haha", 4 ) || !strncmp( Text, "ahah", 4 ) )
+	if( pPlayer->m_flNextChatSoundTime >= gpGlobals->time )
+		return;
+
+	char szLower[64];
+	int n;
+
+	for( n = 0; n < (int)sizeof( szLower ) - 1 && Text[n]; n++ )
+		szLower[n] = tolower( (unsigned char)Text[n] );
+
+	szLower[n] = 0;
+
+	for( int g = 0; g < g_pGameRules->m_iNumChatSoundGroups; g++ )
 	{
-		if( pPlayer->m_flNextChatSoundTime < gpGlobals->time )
-			EMIT_SOUND( INDEXENT( 0 ), CHAN_STATIC, (char*)g_pGameRules->snd_lol[RANDOM_LONG(0,g_pGameRules->TotalServerSounds_lol - 1)][MAX_SOUNDPATH], 1, 0 );
-		pPlayer->m_flNextChatSoundTime = gpGlobals->time + CHAT_SOUND_INTERVAL;
-	}
-	else if( !strncmp( Text, "meow", 4 ))
-	{
-		if( pPlayer->m_flNextChatSoundTime < gpGlobals->time )
-			EMIT_SOUND( INDEXENT( 0 ), CHAN_STATIC, (char *)g_pGameRules->snd_meow[RANDOM_LONG( 0, g_pGameRules->TotalServerSounds_meow - 1 )][MAX_SOUNDPATH], 1, 0 );
-		pPlayer->m_flNextChatSoundTime = gpGlobals->time + CHAT_SOUND_INTERVAL;
+		ChatSoundGroup_t *pGroup = &g_pGameRules->m_ChatSoundGroups[g];
+
+		for( int t = 0; t < pGroup->numTriggers; t++ )
+		{
+			// whole-word match: message must start with the trigger, and the trigger
+			// must not be followed by another letter/digit ("lol" ok, "lol!" ok, "lolo" no)
+			int len = (int)strlen( pGroup->triggers[t] );
+			if( strncmp( szLower, pGroup->triggers[t], len ) )
+				continue;
+			if( isalnum( (unsigned char)szLower[len] ) )
+				continue;
+
+			EMIT_SOUND( INDEXENT( 0 ), CHAN_STATIC, pGroup->sounds[RANDOM_LONG( 0, pGroup->numSounds - 1 )], 1, 0 );
+			pPlayer->m_flNextChatSoundTime = gpGlobals->time + CHAT_SOUND_INTERVAL;
+			return;	// first matching block wins
+		}
 	}
 }
 

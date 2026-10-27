@@ -23,6 +23,11 @@ class CBasePlayer;
 class CItem;
 class CBasePlayerAmmo;
 
+#define MAX_CHAT_SOUND_GROUPS		32
+#define MAX_CHAT_SOUND_TRIGGERS		8	// trigger words per block
+#define MAX_CHAT_TRIGGER_LEN		32
+#define MAX_CHAT_SOUNDS_PER_GROUP	32
+
 #define SND_PLAYER_JOIN "misc/player_join.wav"
 #define SND_PLAYER_LEFT "misc/player_left.wav"
 #define SND_AMMO_RESPAWN "items/item_respawn.wav"
@@ -70,6 +75,14 @@ enum
 	GR_ALLY,
 	GR_NEUTRAL,
 };
+
+typedef struct
+{
+	char triggers[MAX_CHAT_SOUND_TRIGGERS][MAX_CHAT_TRIGGER_LEN];
+	int  numTriggers;
+	char sounds[MAX_CHAT_SOUNDS_PER_GROUP][MAX_SOUNDPATH];
+	int  numSounds;
+} ChatSoundGroup_t;
 
 class CGameRules
 {
@@ -177,7 +190,7 @@ public:
 
 	void InitServerMessages( void );
 	int MessagesLoaded;
-	char *Message[MAX_SERVER_MESSAGES][MAX_SERVER_MESSAGE_LENGTH];
+	char Message[MAX_SERVER_MESSAGES + 1][MAX_SERVER_MESSAGE_LENGTH + 1];
 	bool ServerHasMessages; // true if parsed at least one message
 	float m_flLastTimeServerMsgShown;
 	float m_flServerMsgDelay; // mp_servermsg_delay
@@ -188,10 +201,8 @@ public:
 	float BotCheckTime;
 
 	void InitServerSounds( void );
-	char *snd_lol[MAX_SERVER_MESSAGES][MAX_SERVER_MESSAGE_LENGTH] ;
-	int TotalServerSounds_lol;
-	char *snd_meow[MAX_SERVER_MESSAGES][MAX_SERVER_MESSAGE_LENGTH];
-	int TotalServerSounds_meow;
+	ChatSoundGroup_t m_ChatSoundGroups[MAX_CHAT_SOUND_GROUPS];
+	int m_iNumChatSoundGroups;
 
 	Vector BonusSpawnPoints[MAX_ACTIVE_BONUSES];
 	float NextBonusSpawnTime;

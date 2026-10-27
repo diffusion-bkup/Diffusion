@@ -32,6 +32,7 @@ extern DLL_GLOBAL BOOL g_fGameOver;
 CHalfLifeRules::CHalfLifeRules( void )
 {
 	RefreshSkillData();
+	m_iNumChatSoundGroups = 0;
 }
 
 //=========================================================

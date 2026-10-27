@@ -302,9 +302,9 @@ void CGameRules::ManageMessages(void)
 			int RandomMessage = RANDOM_LONG( 1, MessagesLoaded );
 
 			// handle specific commands
-			if( !strncmp( Message[RandomMessage][MAX_SERVER_MESSAGE_LENGTH], "!", 1 ) )
+			if( !strncmp( Message[RandomMessage], "!", 1 ) )
 			{
-				if( !strncmp( Message[RandomMessage][MAX_SERVER_MESSAGE_LENGTH], "!localtime", 5 ) )
+				if( !strncmp( Message[RandomMessage], "!localtime", 10 ) )
 				{
 					time_t rawtime;
 					struct tm *timeinfo;
@@ -315,7 +315,7 @@ void CGameRules::ManageMessages(void)
 					strftime( timebuf, sizeof( timebuf ), "%d.%m.%Y %H:%M:%S", timeinfo );
 					UTIL_ClientPrintAll( HUD_PRINTTALK, UTIL_VarArgs( "* ^5Server local time^7: %s\n", (char *)timebuf ) );
 				}
-				else if( !strncmp( Message[RandomMessage][MAX_SERVER_MESSAGE_LENGTH], "!timeleft", 9 ) )
+				else if( !strncmp( Message[RandomMessage], "!timeleft", 9 ) )
 				{
 					int seconds = timeleft.value;
 					int minutes = 0;
@@ -332,7 +332,7 @@ void CGameRules::ManageMessages(void)
 					else
 						UTIL_ClientPrintAll( HUD_PRINTTALK, UTIL_VarArgs( "* ^5Time left^7: No time limit\n" ) );
 				}
-				else if( !strncmp( Message[RandomMessage][MAX_SERVER_MESSAGE_LENGTH], "!fragsleft", 9 ) )
+				else if( !strncmp( Message[RandomMessage], "!fragsleft", 10 ) )
 				{
 					int frags_left = fragsleft.value;
 					if( frags_left > 0 )
@@ -340,13 +340,13 @@ void CGameRules::ManageMessages(void)
 					else
 						UTIL_ClientPrintAll( HUD_PRINTTALK, UTIL_VarArgs( "* ^5Frags left^7: No frag limit\n" ) );
 				}
-				else if( !strncmp( Message[RandomMessage][MAX_SERVER_MESSAGE_LENGTH], "!currentmap", 11 ) )
+				else if( !strncmp( Message[RandomMessage], "!currentmap", 11 ) )
 				{
 					UTIL_ClientPrintAll( HUD_PRINTTALK, UTIL_VarArgs( "* ^5Current map^7: %s\n", STRING( gpGlobals->mapname ) ) );
 				}
 			}
 			else // just show written text
-				UTIL_ClientPrintAll( HUD_PRINTTALK, UTIL_VarArgs( "* ^5Server^7: %s\n", (char *)Message[RandomMessage][MAX_SERVER_MESSAGE_LENGTH] ) );
+				UTIL_ClientPrintAll( HUD_PRINTTALK, UTIL_VarArgs( "* ^5Server^7: %s\n", (char *)Message[RandomMessage] ) );
 		}
 	}
 }
@@ -488,40 +488,50 @@ void CGameRules::ManageBots(void)
 // InitServerMessages: parse the text file line-by-line, get notification
 // messages for the server to display.
 //=========================================================================
-void CGameRules::InitServerMessages(void)
-{	
-	char* pMsgFile = (char*)LOAD_FILE("server/messages.txt", NULL);
-	char* File = pMsgFile;
-	char line[MAX_SERVER_MESSAGE_LENGTH + 1];
-	int iMessageNum = 0;
-	int TooLong = 0;
-
+void CGameRules::InitServerMessages( void )
+{
 	MessagesLoaded = 0;
 
-	if (!File)
+	char *pFileStart = (char *)LOAD_FILE( "server/messages.txt", NULL );
+	if( !pFileStart )
 	{
-		ALERT(at_warning, "server/messages.txt couldn't be loaded.\n");
+		ALERT( at_warning, "server/messages.txt couldn't be loaded.\n" );
 		return;
 	}
 
-	while( ((pMsgFile = COM_ParseFile(pMsgFile, line)) != NULL) && (MessagesLoaded < MAX_SERVER_MESSAGES) )
-	{	
-		if (strlen(line) > MAX_SERVER_MESSAGE_LENGTH)
+	char *pFile = pFileStart;
+	char token[1024];
+	int TooLong = 0;
+	int Dropped = 0;
+
+	while( (pFile = COM_ParseFile( pFile, token )) != NULL )
+	{
+		if( token[0] == 0 )	// empty "" entry
+			continue;
+
+		if( strlen( token ) > MAX_SERVER_MESSAGE_LENGTH )
 		{
 			TooLong++;
 			continue;
 		}
 
-		iMessageNum++;
-		Message[iMessageNum][MAX_SERVER_MESSAGE_LENGTH] = copystring(line);
-		MessagesLoaded++;
+		if( MessagesLoaded >= MAX_SERVER_MESSAGES )
+		{
+			Dropped++;
+			continue;
+		}
+
+		MessagesLoaded++;	// messages are 1-based
+		strcpy( Message[MessagesLoaded], token );
 	}
 
-	ALERT(at_aiconsole, "%i server notification messages were loaded.\n", MessagesLoaded);
-	if( TooLong > 0)
-		ALERT(at_warning, "%i server notifications were too long and weren't parsed.\n", TooLong);
+	ALERT( at_aiconsole, "%i server notification messages were loaded.\n", MessagesLoaded );
+	if( TooLong > 0 )
+		ALERT( at_warning, "%i server notifications were too long and weren't parsed.\n", TooLong );
+	if( Dropped > 0 )
+		ALERT( at_warning, "%i server notifications were over the limit of %i and weren't parsed.\n", Dropped, MAX_SERVER_MESSAGES );
 
-	FREE_FILE(File);
+	FREE_FILE( pFileStart );
 
 	m_flLastTimeServerMsgShown = gpGlobals->time + 10;
 }
@@ -531,84 +541,91 @@ void CGameRules::InitServerMessages(void)
 //=========================================================================
 void CGameRules::InitServerSounds( void )
 {
-	char *pSndFile;
-	char line[MAX_SOUNDPATH + 1];
-	int SoundsParsed;
+	m_iNumChatSoundGroups = 0;
 
-	// ------ first, load "lol" sounds -------------
-	pSndFile = (char *)LOAD_FILE( "server/sounds_lol.txt", NULL );
-
-	if( !pSndFile )
+	char *pFileStart = (char *)LOAD_FILE( "server/server_sounds.txt", NULL );
+	if( !pFileStart )
 	{
-		ALERT( at_warning, "server/sounds_lol.txt couldn't be loaded.\n" );
+		ALERT( at_warning, "server/server_sounds.txt couldn't be loaded.\n" );
 		return;
 	}
 
-	SoundsParsed = 0;
-	while( ((pSndFile = COM_ParseFile( pSndFile, line )) != NULL) && (SoundsParsed < MAX_SERVER_MESSAGES) )
-	{
-		if( strlen( line ) > MAX_SOUNDPATH )
-			continue;
+	char *pFile = pFileStart;		// COM_ParseFile advances this; keep the original for FREE_FILE
+	char token[1024];			// COM_ParseFile does no bounds checking, so keep this large
+	ChatSoundGroup_t cur;
+	bool bInBlock = false;
 
-		// need to make sure that sound exists before adding it into array.
-		// so there won't be a situation when there's no sound playing after typing a message
-		if( UTIL_SoundExists( copystring( line ) ) )
+	memset( &cur, 0, sizeof( cur ) );
+
+	while( (pFile = COM_ParseFile( pFile, token )) != NULL )
+	{
+		if( !bInBlock )
 		{
-			snd_lol[SoundsParsed][MAX_SOUNDPATH] = copystring( line );
-			SoundsParsed++;
+			// header: one or more trigger words, then '{'
+			if( !strcmp( token, "{" ) )
+			{
+				if( cur.numTriggers == 0 )
+					ALERT( at_warning, "server_sounds.txt: block without a trigger word, skipping it.\n" );
+				bInBlock = true;
+			}
+			else if( !strcmp( token, "}" ) )
+			{
+				ALERT( at_warning, "server_sounds.txt: stray '}'.\n" );
+			}
+			else if( cur.numTriggers < MAX_CHAT_SOUND_TRIGGERS && strlen( token ) < MAX_CHAT_TRIGGER_LEN )
+			{
+				char *dst = cur.triggers[cur.numTriggers++];
+				for( int i = 0; (dst[i] = tolower( (unsigned char)token[i] )) != 0; i++ )
+					;
+			}
+			else
+			{
+				ALERT( at_warning, "server_sounds.txt: trigger '%s' ignored (too long or too many).\n", token );
+			}
+		}
+		else
+		{
+			if( !strcmp( token, "}" ) )
+			{
+				// close block: commit it if it's usable
+				if( cur.numTriggers > 0 && cur.numSounds > 0 && m_iNumChatSoundGroups < MAX_CHAT_SOUND_GROUPS )
+				{
+					ChatSoundGroup_t *pGroup = &m_ChatSoundGroups[m_iNumChatSoundGroups++];
+					*pGroup = cur;
+
+					// precache from the persistent copy: the engine keeps the pointer
+					for( int i = 0; i < pGroup->numSounds; i++ )
+						PRECACHE_SOUND( pGroup->sounds[i] );
+
+					ALERT( at_aiconsole, "-%s- : %i sound(s) loaded.\n", pGroup->triggers[0], pGroup->numSounds );
+				}
+				else if( cur.numTriggers > 0 )
+				{
+					ALERT( at_warning, "server_sounds.txt: block '%s' has no valid sounds (or group limit hit), skipped.\n", cur.triggers[0] );
+				}
+
+				memset( &cur, 0, sizeof( cur ) );
+				bInBlock = false;
+			}
+			else if( cur.numSounds < MAX_CHAT_SOUNDS_PER_GROUP )
+			{
+				// make sure the sound exists, so typing a trigger never results in silence
+				if( strlen( token ) >= MAX_SOUNDPATH )
+					ALERT( at_warning, "server_sounds.txt: path too long: %s\n", token );
+				else if( !UTIL_SoundExists( token ) )
+					ALERT( at_warning, "server_sounds.txt: sound not found: %s\n", token );
+				else
+					strcpy( cur.sounds[cur.numSounds++], token );
+			}
 		}
 	}
 
-	TotalServerSounds_lol = 0;
-	for( int i = 0; i < SoundsParsed; i++ )
-	{
-		PRECACHE_SOUND( snd_lol[i][MAX_SOUNDPATH] );
-		TotalServerSounds_lol++;
-	}
+	if( bInBlock )
+		ALERT( at_warning, "server_sounds.txt: missing closing '}' at end of file.\n" );
 
-	ALERT( at_aiconsole, "%i -lol- sounds were loaded.\n", TotalServerSounds_lol );
+	ALERT( at_aiconsole, "%i chat sound group(s) loaded.\n", m_iNumChatSoundGroups );
 
-	FREE_FILE( pSndFile );
-
-	// ----------------------------------------------------
-
-	// ------ load "meow" sounds -------------
-	pSndFile = (char *)LOAD_FILE( "server/sounds_meow.txt", NULL );
-
-	if( !pSndFile )
-	{
-		ALERT( at_warning, "server/sounds_meow.txt couldn't be loaded.\n" );
-		return;
-	}
-
-	SoundsParsed = 0;
-	while( ((pSndFile = COM_ParseFile( pSndFile, line )) != NULL) && (SoundsParsed < MAX_SERVER_MESSAGES) )
-	{
-		if( strlen( line ) > MAX_SOUNDPATH )
-			continue;
-
-		// need to make sure that sound exists before adding it into array.
-		// so there won't be a situation when there's no sound playing after typing a message
-		if( UTIL_SoundExists( copystring( line ) ) )
-		{
-			snd_meow[SoundsParsed][MAX_SOUNDPATH] = copystring( line );
-			SoundsParsed++;
-		}
-	}
-
-	TotalServerSounds_meow = 0;
-	for( int i = 0; i < SoundsParsed; i++ )
-	{
-		PRECACHE_SOUND( snd_meow[i][MAX_SOUNDPATH] );
-		TotalServerSounds_meow++;
-	}
-
-	ALERT( at_aiconsole, "%i -meow- sounds were loaded.\n", TotalServerSounds_meow );
-
-	FREE_FILE( pSndFile );
-	// ----------------------------------------------------
-
-	// load next sounds the similar way...
+	FREE_FILE( pFileStart );
 }
 
 //=========================================================
