@@ -36,7 +36,7 @@ extern int g_teamplay;
 float g_flIntermissionStartTime = 0;
 
 extern respawn_t bot_respawn[32];
-void BotCreate( const char *skin, const char *name, const char *skill );
+void BotCreate( const char *skin, const char *name, int skill );
 
 
 int CountPlayers( void );
@@ -478,7 +478,7 @@ void CGameRules::ManageBots(void)
 				bot_respawn[index].state = BOT_IS_RESPAWNING;
 
 				// spawn 1 bot then wait a while (otherwise engine crashes)
-				BotCreate( NULL, NULL, NULL );
+				BotCreate( NULL, NULL, RANDOM_LONG( 0, 4 ) );
 			}
 		}
 	}

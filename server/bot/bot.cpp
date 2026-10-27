@@ -9,11 +9,9 @@
 #include "entities/soundent.h"
 #include "game/gamerules.h"
 #include "game/teamplay_gamerules.h"
-#include "animation.h"
 
 #include "bot.h"
 
-#include <sys/types.h>
 #include <sys/stat.h>
 
 extern DLL_GLOBAL ULONG g_ulModelIndexPlayer;
@@ -26,7 +24,7 @@ extern DLL_GLOBAL BOOL g_fGameOver;
 #define PLAYER_SEARCH_RADIUS (float)40
 
 int f_Observer = 0;  // flag to indicate if player is in observer mode
-int f_botskill = 3;  // default bot skill level
+int f_botskill = 2;  // default bot skill level
 int f_botdontshoot = 0;
 
 Vector vWaypoint[MAX_WAYPOINTS];
@@ -47,21 +45,21 @@ int WaypointsLoaded = 0;
 
 // array of bot respawn information
 respawn_t bot_respawn[32] = {
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL},
-   {FALSE, BOT_IDLE, "", "", "", NULL}, {FALSE, BOT_IDLE, "", "", "", NULL}};
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL},
+   {FALSE, BOT_IDLE, "", "", 0, NULL}, {FALSE, BOT_IDLE, "", "", 0, NULL}};
 
 #define MAX_SKINS 18
 
@@ -154,12 +152,10 @@ static const float pause_time[5][2] =
 	{1.2f, 2.0f}
 };
 
-extern ammo_check_t ammo_check[];
-
 // sounds for TakeDamage speaking effects...
-char hgrunt_sounds[][30] = { HG_SND1, HG_SND2, HG_SND3, HG_SND4, HG_SND5 };
-char barney_sounds[][30] = { BA_SND1, BA_SND2, BA_SND3, BA_SND4, BA_SND5 };
-char scientist_sounds[][30] = { SC_SND1, SC_SND2, SC_SND3, SC_SND4, SC_SND5 };
+const char hgrunt_sounds[][30] = { HG_SND1, HG_SND2, HG_SND3, HG_SND4, HG_SND5 };
+const char barney_sounds[][30] = { BA_SND1, BA_SND2, BA_SND3, BA_SND4, BA_SND5 };
+const char scientist_sounds[][30] = { SC_SND1, SC_SND2, SC_SND3, SC_SND4, SC_SND5 };
 
 bool bWaypointsLoaded = false;
 
@@ -304,10 +300,31 @@ void BotLoadWaypointFile(void)
 		{
 			ALERT( at_warning, "Point %i with no connections!\n", linecount );
 			linecount++;
+			WaypointsLoaded++;
 			continue;
 		}
 
 		WaypointsLoaded++;
+	}
+
+	for( int p = 0; p < WaypointsLoaded; p++ )
+	{
+		int valid = 0;
+
+		for( int c = 0; c < ConnectionsForPoint[p]; c++ )
+		{
+			int t = ConnectedPoints[p][c];
+
+			if( t >= 0 && t < WaypointsLoaded && t != p )
+				ConnectedPoints[p][valid++] = t;
+			else
+				ALERT( at_warning, "Waypoint %i has bad connection %i\n", p, t );
+		}
+
+		for( int c = valid; c < MAX_WAYPOINT_CONNECTIONS; c++ )
+			ConnectedPoints[p][c] = -1;
+
+		ConnectionsForPoint[p] = valid;
 	}
 
 	FREE_FILE( pWPFile );
@@ -458,12 +475,11 @@ void BotDebug( const char *buffer )
    UTIL_ClientPrintAll( HUD_PRINTNOTIFY, buffer );
 }
 
-void BotCreate(const char *skin, const char *name, const char *skill)
+void BotCreate(const char *skin, const char *name, int skill)
 {
 	edict_t *BotEnt;
 	CBot *BotClass;
 	int skill_level;
-	char c_skill[2];
 	char c_skin[BOT_SKIN_LEN+1];
 	char c_name[BOT_NAME_LEN+1];
 	char c_index[4];
@@ -556,7 +572,7 @@ void BotCreate(const char *skin, const char *name, const char *skill)
 			Q_snprintf( err_msg, sizeof( err_msg ), "model \"%s\" is unknown.\n", c_skin );
 			UTIL_ClientPrintAll( HUD_PRINTNOTIFY, err_msg );
 			if (IS_DEDICATED_SERVER())
-			   printf(err_msg);
+				printf( "%s", err_msg );
 
 			UTIL_ClientPrintAll( HUD_PRINTNOTIFY,
 			   "use barney, gina, gman, gordon, helmet, hgrunt,\n");
@@ -577,29 +593,36 @@ void BotCreate(const char *skin, const char *name, const char *skill)
 	  length = strlen( c_name );
 
 	  // remove any illegal characters from name...
-	  for( i = 0; i < length; i++ )
+	  i = 0;
+	  while( i < (int)length )
 	  {
 		  if( (c_name[i] <= ' ') || (c_name[i] > '~') ||
 			  (c_name[i] == '"') )
 		  {
-			  for( j = i; j < length; j++ )  // shuffle chars left (and null)
-				  c_name[j] = c_name[j + 1];
+			  // shuffle chars left (including the terminating null)
+			  memmove( &c_name[i], &c_name[i + 1], length - i );
 			  length--;
+			  // don't advance i, the char that moved into slot i must be checked too
+		  }
+		  else
+		  {
+			  i++;
 		  }
 	  }
+
+	  // if all character are illegal... :|
+	  if( c_name[0] == 0 )
+		  Q_strncpy( c_name, "Bot", sizeof( c_name ) );
    }
 
 	skill_level = 0;
 
-	if( (skill != NULL) && (*skill != 0) )
-		skill_level = Q_atoi( skill );
+	if( skill != -1 )
+		skill_level = skill;
 	else
 		skill_level = f_botskill;
 
-	if ((skill_level < 1) || (skill_level > 5))
-		skill_level = f_botskill;
-
-	Q_snprintf( c_skill, sizeof( c_skill ), "%d", skill_level );
+	skill_level = bound( 0, skill_level, 4 );
 	
 	BotEnt = CREATE_FAKE_CLIENT( c_name );
 
@@ -622,7 +645,7 @@ void BotCreate(const char *skin, const char *name, const char *skill)
 		BotEnt->v.frags = 0;
 
 		index = 0;
-		while ((bot_respawn[index].is_used) && (index < 32))
+		while( (index < 32) && (bot_respawn[index].is_used) )
 			index++;
 
 		if (index >= 32)
@@ -637,9 +660,9 @@ void BotCreate(const char *skin, const char *name, const char *skill)
 
 		// don't store the name here, it might change if same as another
 		Q_strncpy(bot_respawn[index].skin, c_skin, sizeof( bot_respawn[index].skin ));
-		Q_strncpy(bot_respawn[index].skill, c_skill, sizeof( bot_respawn[index].skill ));
+		bot_respawn[index].skill = skill_level;
 
-		sprintf(ptr, "Creating bot \"%s\" using model %s with skill=%d\n", c_name, c_skin, skill_level);
+		sprintf(ptr, "Creating bot \"%s\" using model %s with skill = %d\n", c_name, c_skin, skill_level);
 		UTIL_ClientPrintAll( HUD_PRINTNOTIFY, ptr);
 
 		if (IS_DEDICATED_SERVER())
@@ -658,11 +681,12 @@ void BotCreate(const char *skin, const char *name, const char *skill)
 		else
 			SET_CLIENT_KEY_VALUE( clientIndex, infobuffer, "model", "robo" );
 
-		SET_CLIENT_KEY_VALUE( clientIndex, infobuffer, "skill", c_skill );
+		char TmpText[8];
+		sprintf( TmpText, "%d", skill_level );
+		SET_CLIENT_KEY_VALUE( clientIndex, infobuffer, "skill", TmpText );
 		SET_CLIENT_KEY_VALUE( clientIndex, infobuffer, "index", c_index );
 
 		// randomize the skin
-		char TmpText[8];
 		sprintf( TmpText, "%d", RANDOM_LONG( 0, 255 ) );
 		SET_CLIENT_KEY_VALUE( clientIndex, infobuffer, "topcolor", TmpText );
 		sprintf( TmpText, "%d", RANDOM_LONG( 0, 255 ) );
@@ -726,7 +750,6 @@ void CBot::Spawn( )
 
 	// get bot's skill level (0=good, 4=bad)
 	bot_skill = Q_atoi( GET_INFO_KEY_VALUE( infobuffer, "skill" ) );
-	bot_skill--;  // make 0 based for array index (now 0-4)
 
 	f_max_speed = CVAR_GET_FLOAT("sv_maxspeed");
 
@@ -766,7 +789,6 @@ void CBot::Spawn( )
 	f_use_button_time = 0;
 	b_lift_moving = FALSE;
 	f_use_ladder_time = 0;
-	f_fire_gauss = -1;  // -1 means not charging gauss gun
 
 	b_see_tripmine = FALSE;
 	b_shoot_tripmine = FALSE;
@@ -776,6 +798,10 @@ void CBot::Spawn( )
 	f_bot_use_time = 0;
 	f_wall_on_right = 0;
 	f_wall_on_left = 0;
+	IsStuck = false;
+	f_stuck_time = 0;
+	moved_distance = 0;
+	f_next_duck_decision_time = 0;
 
 	pBotEnemy = NULL;
 	pBotUser = NULL;
@@ -929,7 +955,9 @@ int CBot::BotInFieldOfView(Vector dest)
    // zero degrees means straight ahead,  45 degrees to the left or
    // 45 degrees to the right is the limit of the normal view angle
 
-   return abs((int)view_angle - (int)entity_angles.y);
+   int diff = abs( (int)view_angle - (int)entity_angles.y );
+   if( diff > 180 ) diff = 360 - diff;
+   return diff;
 }
 
 
@@ -969,7 +997,7 @@ float CBot::BotChangeYaw( float speed )
 	ideal = pev->ideal_yaw;
 
 	// find the difference in the current and ideal angle
-	diff = abs(current - ideal);
+	diff = fabs(current - ideal);
 
 	// check if the bot is already facing the ideal_yaw direction...
 	if (diff <= 1)
@@ -1225,7 +1253,7 @@ void CBot::BotFindItem( void )
 			UTIL_TraceLine( vecStart, vecEnd, dont_ignore_monsters, ENT(pev), &tr);
 
 			// check if traced all the way up to the entity (didn't hit wall)
-			if (strcmp(item_name, STRING(tr.pHit->v.classname)) == 0)
+			if( tr.pHit && strcmp( item_name, STRING( tr.pHit->v.classname ) ) == 0 )
 			{
 			   // find distance to item for later use...
 			   float distance = (vecEnd - vecStart).Length( );
@@ -1583,7 +1611,7 @@ void CBot::BotUseLift( void )
 	  f_pause_time = gpGlobals->time + 1;
 
 	  // face opposite from the button
-	  pev->ideal_yaw = -pev->ideal_yaw;  // rotate 180 degrees
+	  pev->ideal_yaw += 180;  // rotate 180 degrees
 
 	  // check for wrap around of angle...
 	  BotFixIdealYaw();
@@ -2001,27 +2029,27 @@ BOOL CBot::BotCanDuckUnder( void )
 
 BOOL CBot::BotShootTripmine( void )
 {
-   if (b_shoot_tripmine != TRUE)
-	  return FALSE;
+	if( b_shoot_tripmine != TRUE )
+		return FALSE;
 
-   // aim at the tripmine and fire the glock...
+	// aim at the tripmine and fire the glock...
 
-   Vector v_enemy = v_tripmine_origin - GetGunPosition( );
+	Vector v_enemy = v_tripmine_origin - GetGunPosition();
 
-   pev->v_angle = UTIL_VecToAngles( v_enemy );
+	pev->v_angle = UTIL_VecToAngles( v_enemy );
 
-   pev->angles.x = 0;
-   pev->angles.y = pev->v_angle.y;
-   pev->angles.z = 0;
+	pev->angles.x = 0;
+	pev->angles.y = pev->v_angle.y;
+	pev->angles.z = 0;
 
-   pev->ideal_yaw = pev->v_angle.y;
+	pev->ideal_yaw = pev->v_angle.y;
 
-   // check for wrap around of angle...
-   BotFixIdealYaw();
+	// check for wrap around of angle...
+	BotFixIdealYaw();
 
-   pev->v_angle.x = -pev->v_angle.x;  //adjust pitch to point gun
+	pev->v_angle.x = -pev->v_angle.x;  //adjust pitch to point gun
 
-   return (BotFireWeapon( v_tripmine_origin, WEAPON_BERETTA, TRUE ));
+	return (BotFireWeapon( v_tripmine_origin, WEAPON_BERETTA, TRUE ));
 }
 
 
@@ -2189,6 +2217,12 @@ void CBot::BotThink( void )
 			gpGlobals->frametime * 1000 );
 		return;
 	}
+
+	if( pBotEnemy && (CBaseEntity *)m_hBotEnemy != pBotEnemy )
+		pBotEnemy = NULL;
+
+	if( pBotPickupItem && (CBaseEntity *)m_hPickupItem != pBotPickupItem )
+		pBotPickupItem = NULL;
 
 	// see if it's time to check for sv_maxspeed change...
 	if (f_speed_check_time <= gpGlobals->time)
@@ -2376,7 +2410,7 @@ void CBot::BotThink( void )
 					tripmine_angles = UTIL_VecToAngles( v_tripmine_origin - GetAbsOrigin() );
 
 					// face away from the tripmine
-					pev->ideal_yaw = -tripmine_angles.y;
+					pev->ideal_yaw = tripmine_angles.y + 180;
 
 					// check for wrap around of angle...
 					BotFixIdealYaw();
@@ -2555,6 +2589,9 @@ void CBot::BotThink( void )
 		bot_was_paused = TRUE;
 	else
 		bot_was_paused = FALSE;
+
+	m_hBotEnemy = pBotEnemy;
+	m_hPickupItem = pBotPickupItem;
 
 	g_engfuncs.pfnRunPlayerMove( edict( ), pev->v_angle, f_move_speed, 0, 0, pev->button, 0, gpGlobals->frametime * 1000 );
 }

@@ -30,6 +30,8 @@ typedef struct  // used in checking if bot can pick up ammo
 	int max_carry;
 } ammo_check_t;
 
+extern const ammo_check_t ammo_check[];
+
 #define BOT_IDLE             0
 #define BOT_NEED_TO_KICK     1
 #define BOT_NEED_TO_RESPAWN  2
@@ -41,7 +43,7 @@ typedef struct  // used to respawn bot at end of round (time/frag limit)
    int  state;    // current state of the bot
    char skin[BOT_SKIN_LEN+1];
    char name[BOT_NAME_LEN+1];
-   char skill[2];
+   int skill;
    CBasePlayer *pBot;
 } respawn_t;
 
@@ -113,7 +115,6 @@ public:
 	BOOL   b_see_tripmine;  // set if bot "sees" a tripmine
 	BOOL   b_shoot_tripmine;  // set if bot should shoot a tripmine
 	Vector v_tripmine_origin;  // origin of tripmine
-	float  f_fire_gauss;    // time to release secondary fire on gauss gun
 	BOOL   bot_was_paused;  // TRUE if bot was previously "paused"
 	float  f_weapon_inventory_time;  // time to check weapon inventory
 	int    respawn_index;   // index in respawn structure for this bot
@@ -121,10 +122,12 @@ public:
 	float  f_bot_use_time;  // time the bot was "used" by player
 	float  f_wall_on_left;  // time since bot has had a wall on the left
 	float  f_wall_on_right; // time since bot has had a wall on the right
+	float	f_next_duck_decision_time;
 
 	CBaseEntity *pBotEnemy; // pointer to bot's enemy
 	CBaseEntity *pBotUser;  // pointer to player using bot
 	CBaseEntity *pBotPickupItem;  // pointer to item we are trying to get
+	EHANDLE m_hBotEnemy, m_hPickupItem;
 	CBasePlayerItem *weapon_ptr[MAX_WEAPONS];  // pointer array to weapons
 	int primary_ammo[MAX_WEAPONS];  // amount of primary ammo available
 	int secondary_ammo[MAX_WEAPONS];  // amount of secondary ammo available

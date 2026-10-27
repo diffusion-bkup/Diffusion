@@ -45,7 +45,7 @@
 // START BOT
 #include "bot/bot.h"
 
-void BotCreate( const char *skin, const char *name, const char *skill );
+void BotCreate( const char *skin, const char *name, int skill );
 void BotGenerateWaypointFile( int LookDistance );
 extern int f_Observer;  // flag for observer mode
 extern int f_botskill;  // default bot skill level
